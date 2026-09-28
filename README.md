@@ -9,6 +9,10 @@
 ![Celery](https://img.shields.io/badge/Celery-5-37814A?logo=celery&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
+https://github.com/user-attachments/assets/79b0f0ab-bdfa-4164-bb81-1e5f76594710
+
+<sub>40-second walkthrough with voiceover. Can't play it? [Download the MP4](docs/demo.mp4).</sub>
+
 ![Review page: extracted fields next to the source text, evidence highlighted](docs/review.png)
 
 ## What problem it solves
