@@ -1,0 +1,37 @@
+{% extends "documents/base.html" %}
+{% load docextract %}
+{% block title %}{{ filter_labels|get_item:filters.status }}{% endblock %}
+{% block content %}
+<section class="stat-row">
+  {% for key, label in filter_labels.items %}
+  <a class="stat stat-{{ key }}{% if filters.status == key %} is-active{% endif %}" href="?status={{ key }}">
+    <span class="stat-value">{{ counts|get_item:key }}</span>
+    <span class="stat-label">{{ label }}</span>
+  </a>
+  {% endfor %}
+</section>
+
+<section class="card upload-bar">
+  <div>
+    <h3>Upload documents</h3>
+    <p class="muted small">PDF (text layer), .txt or .eml. Auto-approved when there are no errors and every field has confidence &ge; {{ confidence_threshold|floatformat:2 }}.</p>
+  </div>
+  <form method="post" action="{% url 'documents:upload' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ upload_form.files }}
+    <button type="submit">Upload &amp; process</button>
+  </form>
+</section>
+
+<article class="card">
+  <header class="card-header">
+    <h2>{{ filter_labels|get_item:filters.status }}</h2>
+    <form class="filters" hx-get="{% url 'documents:queue' %}" hx-target="#queue-table" hx-trigger="input changed delay:300ms from:input[name=q], change" hx-push-url="true">
+      <input type="hidden" name="status" value="{{ filters.status }}">
+      <input type="search" name="q" value="{{ filters.q }}" placeholder="Search vendor, invoice #, file" aria-label="Search">
+      <label class="checkbox"><input type="checkbox" name="errors" value="1" {% if filters.errors %}checked{% endif %}> Errors only</label>
+    </form>
+  </header>
+  <div id="queue-table">{% include "documents/partials/queue_table.html" %}</div>
+</article>
+{% endblock %}

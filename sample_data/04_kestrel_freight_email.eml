@@ -1,0 +1,30 @@
+From: Kestrel Freight Logistics <billing@kestrel-freight.example>
+To: ap@acme-analytics.example
+Subject: Invoice KFL-88412 - March consolidation shipments
+Date: Thu, 12 Mar 2026 09:14:00 +0100
+Message-ID: <kfl-88412@kestrel-freight.example>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+MIME-Version: 1.0
+
+Dear Accounts Payable team,
+
+please find below our invoice for the March consolidation shipments.
+
+Invoice number: KFL-88412
+Invoice date: 12.03.2026
+Supplier: Kestrel Freight Logistics B.V.
+VAT number: NL853746291B01
+
+Pallet transport Rotterdam - Berlin     4     210,00     840,00
+Customs documentation                   1      75,00      75,00
+Fuel surcharge                          1      42,50      42,50
+
+Net amount:    957,50 EUR
+VAT 21%:       201,08 EUR
+Total amount:  1.158,58 EUR
+
+Kind regards,
+Marieke de Vries
+Billing Department, Kestrel Freight Logistics B.V.
+Waalhaven Oostzijde 88, 3087 BM Rotterdam

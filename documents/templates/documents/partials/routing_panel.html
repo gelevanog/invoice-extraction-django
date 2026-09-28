@@ -1,0 +1,19 @@
+<div id="routing-panel"{% if oob %} hx-swap-oob="true"{% endif %}>
+{% if document.status == "needs_review" %}
+  {% if document.routing_reasons %}
+  <div class="callout callout-review">
+    <strong>Why this needs review</strong>
+    <ul>{% for reason in document.routing_reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+  </div>
+  {% else %}
+  <div class="callout callout-ok"><strong>All checks pass now.</strong> The corrected record is ready to approve.</div>
+  {% endif %}
+{% elif document.status == "approved" %}
+  <div class="callout callout-ok">
+    {% if invoice.reviewed_at %}<strong>Approved by {{ invoice.reviewed_by|default:"a reviewer" }}</strong> on {{ invoice.reviewed_at|date:"Y-m-d H:i" }}.{% else %}<strong>Auto-approved:</strong> no error-level issues and all confidences above the threshold.{% endif %}
+    {% if invoice.review_note %}<div class="muted">Note: {{ invoice.review_note }}</div>{% endif %}
+  </div>
+{% elif document.status == "rejected" %}
+  <div class="callout callout-error"><strong>Rejected by {{ invoice.reviewed_by|default:"a reviewer" }}</strong> on {{ invoice.reviewed_at|date:"Y-m-d H:i" }}.{% if invoice.review_note %} <span class="muted">Note: {{ invoice.review_note }}</span>{% endif %}</div>
+{% endif %}
+</div>

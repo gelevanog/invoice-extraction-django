@@ -1,0 +1,18 @@
+{
+  "_comment": "Illustrative static snapshot for demos and tests. Units of currency per 1 EUR. Use FX_PROVIDER=frankfurter for live ECB rates.",
+  "base": "EUR",
+  "as_of": "2026-06-30",
+  "rates": {
+    "USD": 1.0850,
+    "GBP": 0.8540,
+    "CHF": 0.9420,
+    "JPY": 168.20,
+    "PLN": 4.2800,
+    "SEK": 11.3500,
+    "DKK": 7.4600,
+    "NOK": 11.5200,
+    "CZK": 24.9500,
+    "CAD": 1.4800,
+    "AUD": 1.6300
+  }
+}

@@ -1,0 +1,50 @@
+{% load humanize %}
+{% if page.object_list %}
+<div class="table-scroll">
+<table class="queue-table striped">
+  <thead>
+    <tr>
+      <th>Document</th><th>Vendor</th><th>Invoice #</th><th>Issued</th>
+      <th class="num">Total</th><th class="num">In {{ base_currency }}</th>
+      <th>Issues</th><th>Confidence</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for doc in page.object_list %}
+    {% with inv=doc.invoice %}
+    <tr class="clickable" onclick="window.location='{{ doc.get_absolute_url }}'">
+      <td>
+        <a href="{{ doc.get_absolute_url }}" class="doc-name">{{ doc.original_filename }}</a>
+        <div class="muted small">{{ doc.source_type|default:"-" }} · {{ doc.created_at|naturaltime }}</div>
+      </td>
+      <td>{% if inv %}{{ inv.display_vendor|default:"-" }}{% if inv.vendor and inv.vendor.name != inv.vendor_name %}<div class="muted small">as "{{ inv.vendor_name }}"</div>{% endif %}{% else %}-{% endif %}</td>
+      <td class="mono">{{ inv.invoice_number|default:"-" }}</td>
+      <td class="nowrap">{{ inv.issue_date|date:"Y-m-d"|default:"-" }}</td>
+      <td class="num mono">{% if inv.total is not None %}{{ inv.total|intcomma }} {{ inv.currency }}{% else %}-{% endif %}</td>
+      <td class="num mono">{% if inv.total_base is not None %}{{ inv.total_base|intcomma }}{% else %}-{% endif %}</td>
+      <td>
+        {% if doc.error_count %}<span class="pill pill-error">{{ doc.error_count }} error{{ doc.error_count|pluralize }}</span>{% endif %}
+        {% if doc.warning_count %}<span class="pill pill-warning">{{ doc.warning_count }} warning{{ doc.warning_count|pluralize }}</span>{% endif %}
+        {% if not doc.error_count and not doc.warning_count %}<span class="muted">-</span>{% endif %}
+      </td>
+      <td>{% if inv %}{% include "documents/partials/confidence.html" with value=inv.min_confidence %}{% else %}-{% endif %}</td>
+      <td>{% include "documents/partials/status_badge.html" with status=doc.status label=doc.get_status_display %}</td>
+    </tr>
+    {% endwith %}
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% if page.has_other_pages %}
+<nav class="pager">
+  {% if page.has_previous %}<a href="?status={{ filters.status }}&q={{ filters.q|urlencode }}{% if filters.errors %}&errors=1{% endif %}&page={{ page.previous_page_number }}">&larr; Previous</a>{% endif %}
+  <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a href="?status={{ filters.status }}&q={{ filters.q|urlencode }}{% if filters.errors %}&errors=1{% endif %}&page={{ page.next_page_number }}">Next &rarr;</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="empty">
+  <p><strong>Nothing here.</strong></p>
+  <p class="muted">{% if filters.status == "needs_review" %}The review queue is empty - every processed document was auto-approved or already reviewed.{% else %}No documents match these filters.{% endif %}</p>
+</div>
+{% endif %}

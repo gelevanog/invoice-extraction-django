@@ -1,0 +1,19 @@
+{% load docextract %}
+<article id="issues-panel" class="card"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <header class="card-header"><h3>Validation issues</h3><span class="muted small">deterministic checks, re-run after every edit</span></header>
+  {% if issues %}
+  <ul class="issues">
+    {% for issue in issues %}
+    <li class="issue issue-{{ issue.severity }}"{% if issue.field %} data-evidence-key="{{ issue.field }}"{% endif %}>
+      <span class="pill pill-{{ issue.severity }}">{{ issue.severity }}</span>
+      <div>
+        <strong>{{ issue.code|humanize_code }}</strong>{% if issue.field %} <span class="muted small mono">{{ issue.field }}</span>{% endif %}
+        <div>{{ issue.message }}</div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No issues found.</p>
+  {% endif %}
+</article>

@@ -1,0 +1,16 @@
+{% extends "documents/base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<article class="card login-card">
+  <h2>Sign in</h2>
+  <p class="muted small">Reviewers sign in to approve or correct extracted records.</p>
+  <form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="flash flash-error">{{ form.non_field_errors|join:" " }}</div>{% endif %}
+    <label>Username {{ form.username }}</label>
+    <label>Password {{ form.password }}</label>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit">Sign in</button>
+  </form>
+</article>
+{% endblock %}

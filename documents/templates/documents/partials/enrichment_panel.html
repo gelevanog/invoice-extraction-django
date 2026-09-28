@@ -1,0 +1,21 @@
+{% load humanize %}
+<dl id="enrichment-panel" class="enrichment"{% if oob %} hx-swap-oob="true"{% endif %}>
+  <div>
+    <dt>Canonical vendor</dt>
+    <dd>
+      {% if invoice.vendor %}{{ invoice.vendor.name }}
+        <span class="muted small">
+          {% if invoice.vendor_match.method == "tax_id" %}matched by tax ID{% elif invoice.vendor_match.method == "fuzzy" %}fuzzy match {{ invoice.vendor_match.score|floatformat:0 }}% on "{{ invoice.vendor_match.matched_on }}"{% endif %}
+        </span>
+      {% else %}<span class="muted">new vendor (created on approval)</span>{% endif %}
+    </dd>
+  </div>
+  <div>
+    <dt>Total in {{ invoice.base_currency|default:base_currency }}</dt>
+    <dd class="mono">
+      {% if invoice.total_base is not None %}{{ invoice.total_base|intcomma }}
+        {% if invoice.currency != invoice.base_currency %}<span class="muted small">@ {{ invoice.fx_rate|floatformat:4 }} ({{ invoice.fx_source }})</span>{% endif %}
+      {% else %}<span class="muted">-</span>{% endif %}
+    </dd>
+  </div>
+</dl>

@@ -1,0 +1,75 @@
+# `docker compose up --build` runs the full stack with the offline fake LLM - no keys needed.
+# Put overrides (LLM_PROVIDER, API keys, ...) in a .env file next to this one.
+
+x-app: &app
+  build: .
+  image: docextract:latest
+  environment:
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-in-production}
+    DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}
+    DATABASE_URL: postgres://docextract:docextract@db:5432/docextract
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_TASK_ALWAYS_EAGER: "false"
+    LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-5}
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.4-mini}
+    LINE_ITEM_CATEGORIZER: ${LINE_ITEM_CATEGORIZER:-keyword}
+    REVIEW_CONFIDENCE_THRESHOLD: ${REVIEW_CONFIDENCE_THRESHOLD:-0.75}
+    BASE_CURRENCY: ${BASE_CURRENCY:-EUR}
+    FX_PROVIDER: ${FX_PROVIDER:-static}
+    DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD:-demo}
+    LOG_FORMAT: ${LOG_FORMAT:-json}
+    MEDIA_ROOT: /app/media
+  volumes:
+    - media:/app/media
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  web:
+    <<: *app
+    command: ["web"]
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/accounts/login/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    <<: *app
+    command: ["worker"]
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: docextract
+      POSTGRES_USER: docextract
+      POSTGRES_PASSWORD: docextract
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docextract -d docextract"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  media:

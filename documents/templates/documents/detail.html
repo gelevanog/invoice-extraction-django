@@ -1,0 +1,138 @@
+{% extends "documents/base.html" %}
+{% load humanize docextract %}
+{% block title %}{{ document.original_filename }}{% endblock %}
+{% block content %}
+<div class="detail-header">
+  <div>
+    <a href="{% url 'documents:queue' %}" class="muted small">&larr; Review queue</a>
+    <h1>{{ document.original_filename }}</h1>
+    <div class="meta">
+      {% include "documents/partials/status_badge.html" with status=document.status label=document.get_status_display %}
+      <span>{{ document.source_type|default:"-" }}</span>
+      {% if document.pages %}<span>{{ document.pages|length }} page{{ document.pages|length|pluralize }}</span>{% endif %}
+      <span>received {{ document.created_at|naturaltime }}</span>
+      <a href="{% url 'documents:file' document.pk %}" target="_blank" rel="noopener">original file</a>
+    </div>
+  </div>
+  <div class="actions">
+    {% if document.status == "needs_review" %}
+    <form method="post" action="{% url 'documents:decide' document.pk %}" class="decision-form">
+      {% csrf_token %}
+      <input type="text" name="note" placeholder="Optional note for the audit trail" aria-label="Review note">
+      <div class="buttons">
+        <button type="submit" name="action" value="approve">Approve</button>
+        <button type="submit" name="action" value="reject" class="secondary outline">Reject</button>
+      </div>
+    </form>
+    {% endif %}
+    {% if document.status == "needs_review" or document.status == "rejected" or document.status == "failed" %}
+    <form method="post" action="{% url 'documents:reprocess' document.pk %}">
+      {% csrf_token %}<button type="submit" class="small secondary outline" title="Discard extracted data and run the pipeline again">Reprocess</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+{% if document.is_processing %}
+<div class="callout callout-info" hx-get="{{ document.get_absolute_url }}" hx-trigger="every 2s" hx-select="#main" hx-target="#main" hx-swap="outerHTML">
+  <span aria-busy="true">Processing - currently <strong>{{ document.get_status_display }}</strong>. This page refreshes automatically.</span>
+</div>
+{% endif %}
+{% if document.status == "failed" %}
+<div class="callout callout-error"><strong>Processing failed.</strong> {{ document.error }}</div>
+{% endif %}
+
+<div class="review-grid">
+  <section class="review-left">
+    {% if invoice %}
+    {% include "documents/partials/routing_panel.html" %}
+
+    <article class="card">
+      <header class="card-header">
+        <h3>Extracted fields</h3>
+        <span class="muted small">{% if document.status == "needs_review" %}Click a value to correct it. {% endif %}Hover a row to highlight its evidence.</span>
+      </header>
+      <table class="fields">
+        <thead><tr><th>Field</th><th>Value</th><th>Confidence</th><th>Evidence</th></tr></thead>
+        {% include "documents/partials/field_rows.html" %}
+      </table>
+      {% include "documents/partials/enrichment_panel.html" %}
+    </article>
+
+    <article class="card">
+      <header class="card-header"><h3>Line items</h3><span class="muted small">{{ line_items|length }} item{{ line_items|length|pluralize }}</span></header>
+      {% if line_items %}
+      <div class="table-scroll">
+      <table class="line-items">
+        <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th><th>Category</th><th>Conf.</th></tr></thead>
+        <tbody>
+        {% for item in line_items %}
+          <tr data-evidence-key="line_items.{{ forloop.counter0 }}">
+            <td>{{ item.description }}</td>
+            <td class="num mono">{{ item.quantity|floatformat:"-3"|default:"-" }}</td>
+            <td class="num mono">{{ item.unit_price|floatformat:2|default:"-" }}</td>
+            <td class="num mono">{{ item.amount|floatformat:2|intcomma }}</td>
+            <td><span class="pill pill-muted">{{ item.get_category_display }}</span></td>
+            <td>{% include "documents/partials/confidence.html" with value=item.confidence %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}<p class="muted">No line items extracted.</p>{% endif %}
+    </article>
+
+    {% include "documents/partials/issues_panel.html" %}
+    {% endif %}
+
+    {% if runs %}
+    <article class="card">
+      <details>
+        <summary><strong>Extraction runs</strong> <span class="muted small">(LLM audit trail)</span></summary>
+        <div class="table-scroll">
+        <table class="runs">
+          <thead><tr><th>When</th><th>Provider / model</th><th>Result</th><th class="num">Attempts</th><th class="num">Tokens in/out</th><th class="num">Latency</th></tr></thead>
+          <tbody>
+          {% for run in runs %}
+            <tr>
+              <td>{{ run.created_at|date:"Y-m-d H:i:s" }}</td>
+              <td class="mono">{{ run.provider }} / {{ run.model }}</td>
+              <td>{% if run.succeeded %}<span class="pill pill-ok">ok</span>{% else %}<span class="pill pill-error" title="{{ run.error }}">failed</span>{% endif %}</td>
+              <td class="num">{{ run.attempts }}</td>
+              <td class="num mono">{{ run.input_tokens|intcomma }} / {{ run.output_tokens|intcomma }}</td>
+              <td class="num mono">{{ run.latency_ms|intcomma }} ms</td>
+            </tr>
+            {% for attempt in run.attempt_log %}{% if attempt.error %}
+            <tr class="attempt-error"><td></td><td colspan="5"><span class="muted small">attempt {{ attempt.attempt }} rejected:</span><pre class="small">{{ attempt.error }}</pre></td></tr>
+            {% endif %}{% endfor %}
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% with latest=runs.0 %}
+        <p class="muted small">Raw output of the latest attempt:</p>
+        <pre class="raw-output">{{ latest.raw_output }}</pre>
+        {% endwith %}
+      </details>
+    </article>
+    {% endif %}
+  </section>
+
+  <section class="review-right">
+    <article class="card source-card">
+      <header class="card-header">
+        <h3>Source text</h3>
+        <span class="muted small"><mark class="evidence legend">highlighted</mark> = cited as evidence</span>
+      </header>
+      {% for page in pages %}
+      <div class="page">
+        <div class="page-label">Page {{ page.number }}</div>
+        <pre class="source-text">{{ page.html }}</pre>
+      </div>
+      {% empty %}
+      <p class="muted">No text extracted yet.</p>
+      {% endfor %}
+    </article>
+  </section>
+</div>
+{% endblock %}

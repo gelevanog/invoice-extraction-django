@@ -1,0 +1,46 @@
+{% load static %}<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Review queue{% endblock %} · DocExtract</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="{% static 'documents/app.css' %}">
+  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+  <script src="{% static 'documents/review.js' %}" defer></script>
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <header class="topbar">
+    <nav class="container-fluid">
+      <ul>
+        <li><a href="{% url 'documents:queue' %}" class="brand"><span class="brand-mark">DX</span> DocExtract</a></li>
+        {% if user.is_authenticated %}
+        <li><a href="{% url 'documents:queue' %}?status=needs_review">Review queue</a></li>
+        <li><a href="{% url 'documents:queue' %}?status=all">All documents</a></li>
+        <li><a href="{% url 'api-docs' %}">API</a></li>
+        {% if user.is_staff %}<li><a href="{% url 'admin:index' %}">Admin</a></li>{% endif %}
+        {% endif %}
+      </ul>
+      <ul>
+        <li><span class="pill pill-muted" title="LLM provider (LLM_PROVIDER)">LLM: {{ llm_provider }}</span></li>
+        {% if user.is_authenticated %}
+        <li class="muted">{{ user.get_username }}</li>
+        <li>
+          <form method="post" action="{% url 'logout' %}" class="inline-form">
+            {% csrf_token %}<button type="submit" class="outline secondary small">Log out</button>
+          </form>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+  <main class="container-fluid" id="main">
+    {% if messages %}
+    <div class="flash-stack">
+      {% for message in messages %}<div class="flash flash-{{ message.tags }}" role="status">{{ message }}</div>{% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

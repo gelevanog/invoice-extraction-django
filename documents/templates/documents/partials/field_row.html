@@ -1,0 +1,33 @@
+<tr id="field-{{ row.name }}" class="field-row{% if row.severity %} sev-{{ row.severity }}{% endif %}" data-evidence-key="{{ row.name }}">
+  <th scope="row">
+    {{ row.label }}
+    {% if row.edited %}<span class="pill pill-edited" title="Corrected by a reviewer">edited</span>{% endif %}
+  </th>
+  <td class="value">
+    {% if editing %}
+    <form class="edit-form" hx-post="{% url 'documents:edit_field' document.pk row.name %}" hx-target="#field-{{ row.name }}" hx-swap="outerHTML">
+      <input name="value" value="{% if raw is not None %}{{ raw }}{% else %}{{ row.input_value }}{% endif %}" autofocus aria-label="{{ row.label }}"{% if error %} aria-invalid="true"{% endif %}>
+      <button type="submit" class="small">Save</button>
+      <button type="button" class="small secondary outline" hx-get="{% url 'documents:edit_field' document.pk row.name %}?cancel=1" hx-target="#field-{{ row.name }}" hx-swap="outerHTML">Cancel</button>
+      {% if error %}<small class="field-error">{{ error }}</small>{% endif %}
+    </form>
+    {% elif row.editable %}
+    <button type="button" class="value-btn" title="Click to edit" hx-get="{% url 'documents:edit_field' document.pk row.name %}" hx-target="#field-{{ row.name }}" hx-swap="outerHTML">
+      {% if row.display %}<span class="mono">{{ row.display }}</span>{% else %}<span class="missing">not found</span>{% endif %}
+      <span class="edit-hint" aria-hidden="true">edit</span>
+    </button>
+    {% else %}
+      {% if row.display %}<span class="mono">{{ row.display }}</span>{% else %}<span class="missing">not found</span>{% endif %}
+    {% endif %}
+  </td>
+  <td>{% include "documents/partials/confidence.html" with value=row.confidence %}</td>
+  <td class="evidence-cell">
+    {% if row.evidence %}
+      {% if row.evidence.found %}
+      <a href="#" class="evidence-link" data-evidence-key="{{ row.name }}" title="{{ row.evidence.quote }}">p.{{ row.evidence.page|default:"?" }}</a>
+      {% else %}
+      <span class="pill pill-warning" title="Quoted text not found in the document: {{ row.evidence.quote }}">unverified</span>
+      {% endif %}
+    {% else %}<span class="muted">-</span>{% endif %}
+  </td>
+</tr>
