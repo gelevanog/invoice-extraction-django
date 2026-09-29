@@ -12,6 +12,14 @@ COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /uvx /bin/
 
 WORKDIR /app
 
+# Tesseract reads scanned PDFs and photos (OCR_ENGINE=tesseract). More languages:
+#   docker build --build-arg OCR_LANGUAGE_PACKS="eng deu fra" .   (+ OCR_LANGUAGES=eng+deu+fra)
+ARG OCR_LANGUAGE_PACKS="eng"
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr \
+       $(for lang in $OCR_LANGUAGE_PACKS; do echo "tesseract-ocr-$lang"; done) \
+    && rm -rf /var/lib/apt/lists/*
+
 # Dependencies first for layer caching; dev tools (pytest, ruff, reportlab) are excluded.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \

@@ -1,4 +1,4 @@
-.PHONY: install dev worker test lint format typecheck demo samples docker-up docker-down
+.PHONY: install dev worker test lint format typecheck demo feedback samples docker-up docker-down
 
 install:  ## Install dependencies into .venv
 	uv sync
@@ -27,6 +27,11 @@ demo:  ## Process sample_data/ and print the batch summary
 	uv run python manage.py migrate --verbosity 0
 	uv run python manage.py seed_demo
 	uv run python manage.py process_folder sample_data/
+
+feedback:  ## Reviewer-correction loop (few-shot examples), then the accuracy report
+	uv run python manage.py migrate --verbosity 0
+	uv run python manage.py demo_feedback_loop
+	uv run python manage.py accuracy_report
 
 samples:  ## Regenerate the fictional sample documents
 	uv run python scripts/make_samples.py
