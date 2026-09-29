@@ -7,6 +7,7 @@ app_name = "documents"
 urlpatterns = [
     path("", views.queue, name="queue"),
     path("upload/", views.upload, name="upload"),
+    path("accuracy/", views.accuracy, name="accuracy"),
     path("<int:pk>/", views.detail, name="detail"),
     path("<int:pk>/fields/<str:field>/", views.edit_field, name="edit_field"),
     path("<int:pk>/decide/", views.decide, name="decide"),

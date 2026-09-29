@@ -5,7 +5,15 @@ from pathlib import PurePath
 from django.core.files.uploadedfile import UploadedFile
 from rest_framework import serializers
 
-from documents.models import Document, ExtractionRun, Invoice, LineItem, ValidationIssue, Vendor
+from documents.models import (
+    Document,
+    ExtractionRun,
+    FieldReview,
+    Invoice,
+    LineItem,
+    ValidationIssue,
+    Vendor,
+)
 from extraction.parse import SUPPORTED_EXTENSIONS
 
 
@@ -41,7 +49,7 @@ class ExtractionRunSerializer(serializers.ModelSerializer):
         model = ExtractionRun
         fields = (
             "id", "provider", "model", "succeeded", "attempts", "attempt_log",
-            "input_tokens", "output_tokens", "latency_ms", "error", "created_at",
+            "input_tokens", "output_tokens", "latency_ms", "error", "examples", "created_at",
         )  # fmt: skip
 
 
@@ -73,8 +81,8 @@ class DocumentSerializer(serializers.ModelSerializer):
         model = Document
         fields = (
             "id", "url", "review_url", "original_filename", "content_type", "size_bytes", "sha256",
-            "status", "source_type", "error", "routing_reasons", "created_at", "processed_at",
-            "invoice", "issues", "extraction_runs",
+            "status", "source_type", "metadata", "error", "routing_reasons", "created_at",
+            "processed_at", "invoice", "issues", "extraction_runs",
         )  # fmt: skip
 
     def get_review_url(self, obj: Document) -> str:
@@ -114,3 +122,40 @@ class DocumentUploadSerializer(serializers.Serializer):
 
 class ReviewDecisionSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True, max_length=2000, default="")
+
+
+class FieldReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FieldReview
+        fields = (
+            "document_id", "vendor_name", "field", "extracted_value", "approved_value",
+            "corrected", "extracted_confidence", "evidence_quote", "reviewed_at",
+        )  # fmt: skip
+
+
+class AccuracySerializer(serializers.Serializer):
+    key = serializers.CharField()
+    reviewed = serializers.IntegerField()
+    corrected = serializers.IntegerField()
+    accepted = serializers.IntegerField()
+    rate = serializers.FloatField(allow_null=True)
+
+
+class TimelinePointSerializer(serializers.Serializer):
+    document_id = serializers.IntegerField()
+    filename = serializers.CharField()
+    vendor = serializers.CharField()
+    reviewed_at = serializers.DateTimeField()
+    reviewed = serializers.IntegerField()
+    corrected = serializers.IntegerField()
+    rate = serializers.FloatField()
+    cumulative_rate = serializers.FloatField()
+
+
+class AccuracyReportSerializer(serializers.Serializer):
+    overall = AccuracySerializer()
+    invoices_reviewed = serializers.IntegerField()
+    auto_approved = serializers.IntegerField()
+    by_field = AccuracySerializer(many=True)
+    by_vendor = AccuracySerializer(many=True)
+    timeline = TimelinePointSerializer(many=True)

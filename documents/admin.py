@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from documents.models import Document, ExtractionRun, Invoice, LineItem, ValidationIssue, Vendor
+from documents.models import (
+    Document,
+    ExtractionRun,
+    FieldReview,
+    Invoice,
+    LineItem,
+    ValidationIssue,
+    Vendor,
+)
 
 
 @admin.register(Vendor)
@@ -104,6 +112,7 @@ class ExtractionRunAdmin(admin.ModelAdmin):
         "input_tokens",
         "output_tokens",
         "latency_ms",
+        "examples",
         "created_at",
     )
     list_filter = ("provider", "succeeded")
@@ -115,3 +124,19 @@ class ValidationIssueAdmin(admin.ModelAdmin):
     list_display = ("document", "severity", "code", "field", "stage")
     list_filter = ("severity", "code", "stage")
     raw_id_fields = ("document",)
+
+
+@admin.register(FieldReview)
+class FieldReviewAdmin(admin.ModelAdmin):
+    list_display = (
+        "document",
+        "vendor_name",
+        "field",
+        "extracted_value",
+        "approved_value",
+        "corrected",
+        "reviewed_at",
+    )
+    list_filter = ("corrected", "field")
+    search_fields = ("vendor_name", "extracted_value", "approved_value")
+    raw_id_fields = ("document", "vendor", "reviewed_by")

@@ -123,7 +123,13 @@ DOCEXTRACT = {
     "ANTHROPIC_MODEL": env("ANTHROPIC_MODEL", default="claude-sonnet-5"),
     "OPENAI_MODEL": env("OPENAI_MODEL", default="gpt-5.4-mini"),
     "LLM_TIMEOUT_SECONDS": env.float("LLM_TIMEOUT_SECONDS", default=120.0),
+    "OPENROUTER_MODEL": env("OPENROUTER_MODEL", default="dots-studio/dots-3-note-preview:free"),
+    "OPENROUTER_FALLBACK_MODELS": env.list("OPENROUTER_FALLBACK_MODELS", default=[]),
+    "OPENROUTER_SITE_URL": env("OPENROUTER_SITE_URL", default=""),
+    "OPENROUTER_APP_NAME": env("OPENROUTER_APP_NAME", default="DocExtract"),
     "LLM_MAX_ATTEMPTS": env.int("LLM_MAX_ATTEMPTS", default=3),
+    "LLM_MAX_RETRIES": env.int("LLM_MAX_RETRIES", default=2),
+    "LLM_MIN_INTERVAL_SECONDS": env.float("LLM_MIN_INTERVAL_SECONDS", default=0.0),
     "REVIEW_CONFIDENCE_THRESHOLD": env.float("REVIEW_CONFIDENCE_THRESHOLD", default=0.75),
     "REVIEW_ON_WARNINGS": env.bool("REVIEW_ON_WARNINGS", default=False),
     "REVIEW_NEW_VENDORS": env.bool("REVIEW_NEW_VENDORS", default=False),
@@ -134,6 +140,12 @@ DOCEXTRACT = {
     "FX_RATES_FILE": env("FX_RATES_FILE", default=""),
     "FX_API_URL": env("FX_API_URL", default="https://api.frankfurter.dev/v1"),
     "LINE_ITEM_CATEGORIZER": env("LINE_ITEM_CATEGORIZER", default="keyword"),
+    "OCR_ENGINE": env("OCR_ENGINE", default="tesseract"),
+    "OCR_LANGUAGES": env("OCR_LANGUAGES", default="eng"),
+    "OCR_DPI": env.int("OCR_DPI", default=300),
+    "OCR_MIN_CONFIDENCE": env.float("OCR_MIN_CONFIDENCE", default=0.65),
+    "FEWSHOT_MAX_EXAMPLES": env.int("FEWSHOT_MAX_EXAMPLES", default=3),
+    "FEWSHOT_MAX_CHARS": env.int("FEWSHOT_MAX_CHARS", default=4000),
 }
 
 # --- Logging (structlog on top of stdlib logging) -----------------------------------

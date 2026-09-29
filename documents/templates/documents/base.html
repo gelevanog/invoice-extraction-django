@@ -17,6 +17,7 @@
         {% if user.is_authenticated %}
         <li><a href="{% url 'documents:queue' %}?status=needs_review">Review queue</a></li>
         <li><a href="{% url 'documents:queue' %}?status=all">All documents</a></li>
+        <li><a href="{% url 'documents:accuracy' %}">Accuracy</a></li>
         <li><a href="{% url 'api-docs' %}">API</a></li>
         {% if user.is_staff %}<li><a href="{% url 'admin:index' %}">Admin</a></li>{% endif %}
         {% endif %}

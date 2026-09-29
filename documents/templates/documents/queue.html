@@ -14,7 +14,7 @@
 <section class="card upload-bar">
   <div>
     <h3>Upload documents</h3>
-    <p class="muted small">PDF (text layer), .txt or .eml. Auto-approved when there are no errors and every field has confidence &ge; {{ confidence_threshold|floatformat:2 }}.</p>
+    <p class="muted small">PDF (text layer or scanned), photo or scan (PNG, JPEG, TIFF), .txt or .eml. Auto-approved when there are no errors and every field has confidence &ge; {{ confidence_threshold|floatformat:2 }}.</p>
   </div>
   <form method="post" action="{% url 'documents:upload' %}" enctype="multipart/form-data">
     {% csrf_token %}

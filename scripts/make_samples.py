@@ -9,12 +9,25 @@ deliberately "tricky" to exercise validation and routing:
     04  supplier email, EU number format, no due date   -> approved with a warning
     05  receipt with an unlabeled reference number      -> needs review (low confidence)
     06  re-sent copy of invoice 01                      -> needs review (duplicate)
+    07  scanned invoice: image-only PDF, skewed, noisy   -> OCR
+    08  phone photo of a faded till receipt (JPEG)      -> OCR
+
+``feedback_loop/`` holds two invoices from one vendor whose labels ("Document no.",
+"Tax point") the offline fake extractor does not know; ``manage.py
+demo_feedback_loop`` uses them to show reviewer corrections turning into few-shot
+examples.
+
+Scans are rendered from the same vector layout, then degraded deterministically
+(fixed random seed): rotation, blur and speckle noise for the scan; a desk
+background, uneven lighting, blur and JPEG compression for the photo.
 
 Usage:  uv run python scripts/make_samples.py [output_dir]
 """
 
 from __future__ import annotations
 
+import io
+import random
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -22,7 +35,10 @@ from email.message import EmailMessage
 from email.utils import format_datetime
 from pathlib import Path
 
+import pypdfium2 as pdfium
+from PIL import Image, ImageChops, ImageFilter
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -238,6 +254,181 @@ Thank you for shopping local!
 """
 
 
+LANTERN = PdfInvoice(
+    filename="07_lantern_print_scan.pdf",
+    vendor_lines=[
+        "Lantern Print Studio GmbH",
+        "Hafenstrasse 8, 20359 Hamburg, Germany",
+        "VAT ID: DE274839165",
+    ],
+    meta=[
+        ("Invoice No", "LPS-24-0918"),
+        ("Invoice Date", "2026-03-09"),
+        ("Due Date", "2026-04-08"),
+    ],
+    items=[
+        ("Business cards, 400gsm (500 pcs)", "3", "45.00", "135.00"),
+        ("Roll-up banner 85 x 200 cm", "2", "119.00", "238.00"),
+        ("Flyers A5, 135gsm (2000 pcs)", "1", "164.00", "164.00"),
+    ],
+    totals=[("Subtotal", "537.00"), ("VAT 19%", "102.03"), ("Total due (EUR)", "639.03")],
+    footer=["Payment by bank transfer within 30 days. Thank you for your order."],
+)
+
+HAVERFORD_ADDRESS = [
+    "Haverford Office Interiors Ltd",
+    "12 Canal Street, Manchester M1 3HE, United Kingdom",
+    "VAT Reg No: GB 318 4476 25",
+]
+
+HAVERFORD_MARCH = PdfInvoice(
+    filename="haverford_invoice_march.pdf",
+    vendor_lines=HAVERFORD_ADDRESS,
+    meta=[
+        ("Document no.", "HOI-7731"),
+        ("Tax point", "06/03/2026"),
+        ("Payment due", "05/04/2026"),
+    ],
+    items=[
+        ("Height-adjustable desk frame", "4", "310.00", "1,240.00"),
+        ("Desk installation (per desk)", "4", "45.00", "180.00"),
+    ],
+    totals=[("Subtotal", "1,420.00"), ("VAT 20%", "284.00"), ("Total (GBP)", "1,704.00")],
+    footer=["Goods remain our property until paid in full."],
+)
+
+HAVERFORD_APRIL = PdfInvoice(
+    filename="haverford_invoice_april.pdf",
+    vendor_lines=HAVERFORD_ADDRESS,
+    meta=[
+        ("Document no.", "HOI-7802"),
+        ("Tax point", "03/04/2026"),
+        ("Payment due", "03/05/2026"),
+    ],
+    items=[
+        ("Acoustic desk screen 140 cm", "6", "89.00", "534.00"),
+        ("Cable tray, steel", "6", "24.50", "147.00"),
+    ],
+    totals=[("Subtotal", "681.00"), ("VAT 20%", "136.20"), ("Total (GBP)", "817.20")],
+    footer=["Goods remain our property until paid in full."],
+)
+
+COPPERLEAF_RECEIPT = [
+    "COPPERLEAF CATERING LTD",
+    "42 Mill Lane, Bristol BS1 5TY",
+    "VAT Reg No: GB 284 1937 62",
+    "",
+    "TAX INVOICE",
+    "Invoice No: CC-20931",
+    "Date: 20/03/2026",
+    "",
+    "Lunch platter 10p  2   48.00   96.00",
+    "Fruit bowl         3   12.50   37.50",
+    "Coffee service     1   35.00   35.00",
+    "",
+    "Subtotal                   168.50",
+    "VAT 20%                     33.70",
+    "TOTAL GBP                  202.20",
+    "",
+    "Paid by card **** 8812",
+    "Thank you!",
+]
+
+
+@dataclass(frozen=True)
+class Degradation:
+    angle: float  # degrees, counter-clockwise
+    blur: float  # Gaussian blur radius in pixels
+    speckle: float  # share of pixels replaced by black or white noise
+    seed: int
+
+
+def rasterize(pdf_path: Path, dpi: int) -> Image.Image:
+    pdf = pdfium.PdfDocument(str(pdf_path))
+    try:
+        return pdf[0].render(scale=dpi / 72).to_pil().convert("RGB")
+    finally:
+        pdf.close()
+
+
+def _speckle(size: tuple[int, int], share: float, rnd: random.Random) -> Image.Image:
+    """Mask image: 0/255 where noise hits, 128 (neutral in 'overlay') elsewhere."""
+    cut = int(share * 128)
+    noise = Image.frombytes("L", size, rnd.randbytes(size[0] * size[1]))
+    return noise.point(lambda v: 0 if v < cut else 255 if v > 255 - cut else 128)
+
+
+def scan(page: Image.Image, fx: Degradation) -> Image.Image:
+    """Flatbed-scanner look: grayscale, slightly skewed, soft, with dust speckles."""
+    rnd = random.Random(fx.seed)
+    image = page.convert("L").rotate(fx.angle, Image.Resampling.BICUBIC, fillcolor=255)
+    image = image.filter(ImageFilter.GaussianBlur(fx.blur))
+    return ImageChops.overlay(image, _speckle(image.size, fx.speckle, rnd))
+
+
+def photograph(page: Image.Image, fx: Degradation) -> Image.Image:
+    """Phone-photo look: paper on a desk, tilted, light falling off, soft focus."""
+    rnd = random.Random(fx.seed)
+    width, height = page.size
+    desk = Image.new("RGB", (int(width * 1.5), int(height * 1.12)), (84, 68, 54))
+    desk.paste(page, ((desk.width - width) // 2, (desk.height - height) // 2))
+    image = desk.rotate(fx.angle, Image.Resampling.BICUBIC, fillcolor=(84, 68, 54))
+    # Vignette plus light falling off towards the bottom of the frame.
+    vignette = Image.radial_gradient("L").resize(image.size).point(lambda v: 255 - v // 3)
+    falloff = Image.linear_gradient("L").resize(image.size).point(lambda v: 255 - v // 4)
+    light = ImageChops.multiply(vignette, falloff)
+    image = ImageChops.multiply(image, Image.merge("RGB", [light] * 3))
+    image = image.filter(ImageFilter.GaussianBlur(fx.blur))
+    noise = _speckle(image.size, fx.speckle, rnd).convert("RGB")
+    return ImageChops.overlay(image, noise)
+
+
+def render_receipt(lines: list[str]) -> Path:
+    """Narrow thermal-printer receipt (faded monospace print) as a temporary PDF."""
+    buffer = io.BytesIO()
+    width, height = 80 * mm, (len(lines) * 4.4 + 16) * mm
+    pdf = canvas.Canvas(buffer, pagesize=(width, height), invariant=True)
+    pdf.setFillColorRGB(0.33, 0.33, 0.33)  # thermal print fades to grey
+    y = height - 9 * mm
+    for line in lines:
+        pdf.setFont("Courier-Bold" if line.isupper() else "Courier", 8.2)
+        pdf.drawString(5 * mm, y, line)
+        y -= 4.4 * mm
+    pdf.showPage()
+    pdf.save()
+    return _temp_pdf(buffer.getvalue())
+
+
+def _temp_pdf(data: bytes) -> Path:
+    import tempfile
+
+    handle = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)  # noqa: SIM115
+    handle.write(data)
+    handle.close()
+    return Path(handle.name)
+
+
+def write_scanned_pdf(doc: PdfInvoice, fx: Degradation, out_dir: Path, dpi: int = 200) -> Path:
+    """Image-only PDF (no text layer), like the output of an office scanner."""
+    vector = render_pdf(doc, _temp_dir())
+    image = scan(rasterize(vector, dpi), fx)
+    path = out_dir / doc.filename
+    image.save(path, "PDF", resolution=dpi, creationDate=None, modDate=None)
+    return path
+
+
+def write_photo(lines: list[str], fx: Degradation, path: Path, dpi: int = 220) -> Path:
+    receipt = rasterize(render_receipt(lines), dpi)
+    photograph(receipt, fx).save(path, "JPEG", quality=72)
+    return path
+
+
+def _temp_dir() -> Path:
+    import tempfile
+
+    return Path(tempfile.mkdtemp())
+
+
 def write_email(out_dir: Path) -> Path:
     message = EmailMessage()
     message["From"] = "Kestrel Freight Logistics <billing@kestrel-freight.example>"
@@ -263,6 +454,19 @@ def main(out_dir: Path) -> None:
     receipt = out_dir / "05_pinecrest_hardware_receipt.txt"
     receipt.write_text(PINECREST_RECEIPT, encoding="utf-8")
     written += [receipt, render_pdf(BRIGHTLINE_COPY, out_dir)]
+    written.append(
+        write_scanned_pdf(LANTERN, Degradation(angle=0.9, blur=0.7, speckle=0.004, seed=7), out_dir)
+    )
+    written.append(
+        write_photo(
+            COPPERLEAF_RECEIPT,
+            Degradation(angle=-3.2, blur=1.1, speckle=0.002, seed=8),
+            out_dir / "08_copperleaf_catering_photo.jpg",
+        )
+    )
+    loop_dir = out_dir / "feedback_loop"
+    loop_dir.mkdir(exist_ok=True)
+    written += [render_pdf(HAVERFORD_MARCH, loop_dir), render_pdf(HAVERFORD_APRIL, loop_dir)]
     for path in written:
         print(f"wrote {path.relative_to(ROOT) if path.is_relative_to(ROOT) else path}")
 

@@ -21,6 +21,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
+from documents import feedback
 from documents.models import Document, ExtractionRun, Invoice, LineItem, ValidationIssue, Vendor
 from extraction.enrich import EnrichmentResult
 from extraction.enrich.categorize import Categorizer, KeywordCategorizer, LLMCategorizer
@@ -31,6 +32,7 @@ from extraction.extract import ExtractionResult
 from extraction.issues import Issue
 from extraction.llm import LLMProvider, build_provider
 from extraction.normalize import parse_amount, parse_date
+from extraction.ocr import OcrEngine, build_ocr_engine
 from extraction.parse import ParseError
 from extraction.pipeline import InvoicePipeline, PipelineConfig
 from extraction.route import RoutingConfig
@@ -53,8 +55,21 @@ def _cfg() -> dict[str, Any]:
 def build_llm_provider() -> LLMProvider:
     cfg = _cfg()
     name = cfg["LLM_PROVIDER"].lower()
-    model = {"anthropic": cfg["ANTHROPIC_MODEL"], "openai": cfg["OPENAI_MODEL"]}.get(name)
-    return build_provider(name, model=model, timeout=cfg["LLM_TIMEOUT_SECONDS"])
+    models = {
+        "anthropic": cfg["ANTHROPIC_MODEL"],
+        "openai": cfg["OPENAI_MODEL"],
+        "openrouter": cfg["OPENROUTER_MODEL"],
+    }
+    return build_provider(
+        name,
+        model=models.get(name),
+        timeout=cfg["LLM_TIMEOUT_SECONDS"],
+        max_retries=cfg["LLM_MAX_RETRIES"],
+        min_interval=cfg["LLM_MIN_INTERVAL_SECONDS"],
+        fallback_models=cfg["OPENROUTER_FALLBACK_MODELS"],
+        site_url=cfg["OPENROUTER_SITE_URL"],
+        app_name=cfg["OPENROUTER_APP_NAME"],
+    )
 
 
 def build_fx_provider() -> FxRatesProvider:
@@ -74,6 +89,11 @@ def build_categorizer(provider: LLMProvider) -> Categorizer:
     )
 
 
+def build_ocr(provider: LLMProvider) -> OcrEngine | None:
+    cfg = _cfg()
+    return build_ocr_engine(cfg["OCR_ENGINE"], provider=provider, languages=cfg["OCR_LANGUAGES"])
+
+
 def build_pipeline(document_id: int | None = None) -> InvoicePipeline:
     cfg = _cfg()
     provider = build_llm_provider()
@@ -83,18 +103,25 @@ def build_pipeline(document_id: int | None = None) -> InvoicePipeline:
             max_attempts=cfg["LLM_MAX_ATTEMPTS"],
             base_currency=cfg["BASE_CURRENCY"].upper(),
             vendor_match_threshold=cfg["VENDOR_MATCH_THRESHOLD"],
-            validation=ValidationConfig(amount_tolerance=Decimal(cfg["AMOUNT_TOLERANCE"])),
+            validation=ValidationConfig(
+                amount_tolerance=Decimal(cfg["AMOUNT_TOLERANCE"]),
+                min_ocr_confidence=cfg["OCR_MIN_CONFIDENCE"],
+            ),
             routing=RoutingConfig(
                 confidence_threshold=cfg["REVIEW_CONFIDENCE_THRESHOLD"],
                 review_on_warnings=cfg["REVIEW_ON_WARNINGS"],
                 review_new_vendors=cfg["REVIEW_NEW_VENDORS"],
             ),
+            ocr_dpi=cfg["OCR_DPI"],
+            max_example_chars=cfg["FEWSHOT_MAX_CHARS"],
         ),
         fx_provider=build_fx_provider(),
         categorizer=build_categorizer(provider),
         vendors=vendor_records,
         duplicate_lookup=DuplicateFinder(document_id, cfg["VENDOR_MATCH_THRESHOLD"]),
         today=timezone.localdate,
+        ocr=build_ocr(provider),
+        examples=lambda parsed: feedback.examples_for(parsed, exclude_document_id=document_id),
     )
 
 
@@ -189,9 +216,15 @@ def _run_stages(document: Document) -> None:
         S.PARSED,
         source_type=parsed.source_type,
         source_text=parsed.text,
-        pages=[{"number": p.number, "start": p.start, "end": p.end} for p in parsed.pages],
+        pages=Document.pages_json(parsed),
+        metadata=parsed.metadata,
     )
-    logger.info("stage.parsed", pages=len(parsed.pages), chars=len(parsed.text))
+    logger.info(
+        "stage.parsed",
+        pages=len(parsed.pages),
+        chars=len(parsed.text),
+        ocr_confidence=parsed.metadata.get("ocr_confidence"),
+    )
 
     result = pipeline.extract(parsed)
     _save_extraction_run(document, result)
@@ -259,6 +292,7 @@ def _save_extraction_run(document: Document, result: ExtractionResult[InvoiceSch
         output_tokens=result.output_tokens,
         latency_ms=result.latency_ms,
         error=result.error or "",
+        examples=result.examples,
     )
 
 
@@ -295,6 +329,8 @@ def _evidence_json(quote: str, page: int | None, span: Span | None) -> dict[str,
     data: dict[str, Any] = {"quote": quote, "page": page, "found": span is not None}
     if span is not None:
         data.update(start=span.start, end=span.end, page=span.page or page)
+        if span.ocr_confidence is not None:
+            data["ocr_confidence"] = round(span.ocr_confidence, 2)
     return data
 
 
@@ -381,6 +417,7 @@ def approve(document: Document, user: AbstractBaseUser | None, note: str = "") -
         invoice = document.invoice
         _mark_reviewed(invoice, user, note)
         _register_vendor(invoice)
+        feedback.record_review(invoice)
     logger.info("review.approved", document_id=document.pk)
     return document
 
@@ -406,7 +443,13 @@ def reset_for_reprocessing(document: Document) -> Document:
         Invoice.objects.filter(document=document).delete()
         document.issues.all().delete()
         document.transition_to(
-            S.UPLOADED, error="", routing_reasons=[], source_text="", pages=[], processed_at=None
+            S.UPLOADED,
+            error="",
+            routing_reasons=[],
+            source_text="",
+            pages=[],
+            metadata={},
+            processed_at=None,
         )
     return document
 

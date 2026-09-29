@@ -63,16 +63,16 @@ def test_upload_processes_document(
 
 
 def test_upload_rejects_unsupported_type(api_client: APIClient) -> None:
-    image = SimpleUploadedFile("scan.png", b"\x89PNG", content_type="image/png")
-    response = api_client.post("/api/documents/", {"file": image}, format="multipart")
+    sheet = SimpleUploadedFile("costs.xlsx", b"PK\x03\x04", content_type="application/zip")
+    response = api_client.post("/api/documents/", {"file": sheet}, format="multipart")
     assert response.status_code == 400
     assert "Unsupported file type" in response.json()["file"][0]
     assert Document.objects.count() == 0
 
 
 @pytest.fixture
-def all_samples(demo_vendors: Any, sample_dir: Path) -> dict[str, Document]:
-    report = import_folder(sample_dir)
+def all_samples(demo_vendors: Any, text_sample_dir: Path) -> dict[str, Document]:
+    report = import_folder(text_sample_dir)
     return {item.path.name: item.document for item in report.items if item.document}
 
 

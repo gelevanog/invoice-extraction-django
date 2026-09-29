@@ -25,7 +25,9 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument(
-            "--with-samples", action="store_true", help="Also process the files in sample_data/."
+            "--with-samples",
+            action="store_true",
+            help="Also process sample_data/ and run the reviewer-correction demo.",
         )
         parser.add_argument("--username", default=os.environ.get("DEMO_USERNAME", "demo"))
         parser.add_argument(
@@ -53,4 +55,6 @@ class Command(BaseCommand):
 
         if options["with_samples"]:
             folder = str(settings.BASE_DIR / "sample_data")
-            call_command("process_folder", folder, stdout=getattr(self.stdout, "_out", self.stdout))
+            out = getattr(self.stdout, "_out", self.stdout)
+            call_command("process_folder", folder, stdout=out)
+            call_command("demo_feedback_loop", reviewer=options["username"], stdout=out)

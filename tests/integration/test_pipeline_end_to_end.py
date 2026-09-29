@@ -14,10 +14,11 @@ from documents import services
 from documents.batch import import_folder
 from documents.models import Document, ExtractionRun, Invoice, Vendor
 from extraction.status import DocumentStatus
+from tests.conftest import HAS_TESSERACT, OCR_SAMPLES
 
 pytestmark = pytest.mark.django_db
 
-EXPECTED = {
+TEXT_SAMPLES = {
     "01_brightline_software_invoice.pdf": ("approved", []),
     "02_northwind_office_supplies.pdf": ("approved", []),
     "03_bluepeak_consulting_invoice.pdf": ("needs_review", ["line_items_sum_mismatch"]),
@@ -25,6 +26,8 @@ EXPECTED = {
     "05_pinecrest_hardware_receipt.txt": ("needs_review", ["missing_due_date"]),
     "06_brightline_software_invoice_copy.pdf": ("needs_review", ["duplicate_invoice"]),
 }
+# Scans need Tesseract; without it they fail at the parse stage with a clear message.
+EXPECTED = {**TEXT_SAMPLES, **dict.fromkeys(OCR_SAMPLES)}
 
 
 @pytest.fixture
@@ -35,14 +38,23 @@ def processed(demo_vendors: Any, sample_dir: Path) -> dict[str, Document]:
 
 def test_routing_of_all_samples(processed: dict[str, Document]) -> None:
     assert set(processed) == set(EXPECTED)
-    for name, (status, blocking_codes) in EXPECTED.items():
+    for name, (status, blocking_codes) in TEXT_SAMPLES.items():
         document = processed[name]
         codes = sorted(document.issues.exclude(severity="info").values_list("code", flat=True))
         assert (document.status, codes) == (status, blocking_codes), name
 
 
+@pytest.mark.skipif(HAS_TESSERACT, reason="covers the missing-binary path")
+def test_scans_fail_clearly_without_tesseract(processed: dict[str, Document]) -> None:
+    for name in OCR_SAMPLES:
+        assert processed[name].status == "failed"
+        assert "Tesseract is not installed" in processed[name].error
+
+
 def test_status_machine_and_audit_trail(processed: dict[str, Document]) -> None:
     for document in processed.values():
+        if document.status == "failed":  # scans without Tesseract, covered above
+            continue
         assert document.processed_at is not None
         assert document.source_text
         assert document.pages[0]["start"] == 0
@@ -152,19 +164,21 @@ def test_failed_extraction_marks_document_failed(db: None, monkeypatch: pytest.M
     assert ExtractionRun.objects.get(document=document).succeeded is False
 
 
-def test_unsupported_file_fails_at_parse(db: None) -> None:
+def test_unreadable_image_fails_at_parse(db: None) -> None:
     document = services.create_document("scan.png", b"\x89PNG")
     document = services.process_document(document.pk)
     assert document.status == "failed"
-    assert "OCR" in document.error
+    assert "OCR failed: Could not read image" in document.error
 
 
 def test_process_folder_command_prints_summary(demo_vendors: Any, sample_dir: Path) -> None:
     out = io.StringIO()
     call_command("process_folder", str(sample_dir), stdout=out)
     output = out.getvalue()
-    assert "Processed 6 document(s)" in output
-    assert "3 approved, 3 needs_review" in output
+    assert f"Processed {len(EXPECTED)} document(s)" in output
+    assert "BLS-2026-0142" in output
+    if HAS_TESSERACT:
+        assert "LPS-24-0918" in output
     assert "BLS-2026-0142" in output
 
 

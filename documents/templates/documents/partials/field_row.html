@@ -24,7 +24,7 @@
   <td class="evidence-cell">
     {% if row.evidence %}
       {% if row.evidence.found %}
-      <a href="#" class="evidence-link" data-evidence-key="{{ row.name }}" title="{{ row.evidence.quote }}">p.{{ row.evidence.page|default:"?" }}</a>
+      <a href="#" class="evidence-link" data-evidence-key="{{ row.name }}" title="{{ row.evidence.quote }}{% if row.evidence.ocr_confidence is not None %} (OCR confidence {{ row.evidence.ocr_confidence|floatformat:2 }}){% endif %}">p.{{ row.evidence.page|default:"?" }}</a>
       {% else %}
       <span class="pill pill-warning" title="Quoted text not found in the document: {{ row.evidence.quote }}">unverified</span>
       {% endif %}

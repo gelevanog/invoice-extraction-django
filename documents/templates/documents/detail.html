@@ -9,6 +9,7 @@
     <div class="meta">
       {% include "documents/partials/status_badge.html" with status=document.status label=document.get_status_display %}
       <span>{{ document.source_type|default:"-" }}</span>
+      {% if document.ocr_confidence is not None %}<span class="pill pill-muted" title="Text recognised by {{ document.metadata.ocr_engine }}">OCR {{ document.ocr_confidence|floatformat:2 }}</span>{% endif %}
       {% if document.pages %}<span>{{ document.pages|length }} page{{ document.pages|length|pluralize }}</span>{% endif %}
       <span>received {{ document.created_at|naturaltime }}</span>
       <a href="{% url 'documents:file' document.pk %}" target="_blank" rel="noopener">original file</a>
@@ -122,11 +123,17 @@
     <article class="card source-card">
       <header class="card-header">
         <h3>Source text</h3>
-        <span class="muted small"><mark class="evidence legend">highlighted</mark> = cited as evidence</span>
+        <span class="muted small"><mark class="evidence legend">highlighted</mark> = cited as evidence{% if uncertain_word_count %} · <span class="ocr-low">underlined</span> = OCR confidence below {{ confidence_threshold|floatformat:2 }}{% endif %}</span>
       </header>
+      {% if is_image %}
+      <details class="scan-preview" open>
+        <summary class="muted small">Original image</summary>
+        <img src="{% url 'documents:file' document.pk %}" alt="Uploaded image of {{ document.original_filename }}" loading="lazy">
+      </details>
+      {% endif %}
       {% for page in pages %}
       <div class="page">
-        <div class="page-label">Page {{ page.number }}</div>
+        <div class="page-label">Page {{ page.number }}{% if page.ocr_confidence is not None %} · OCR text, confidence {{ page.ocr_confidence|floatformat:2 }}{% endif %}</div>
         <pre class="source-text">{{ page.html }}</pre>
       </div>
       {% empty %}

@@ -11,6 +11,7 @@ from django.urls import reverse
 from extraction.enrich.categorize import ExpenseCategory
 from extraction.enrich.vendors import VendorRecord
 from extraction.issues import Severity
+from extraction.ocr.base import OcrWord
 from extraction.parse import Page, ParsedDocument
 from extraction.schemas import Invoice as InvoiceSchema
 from extraction.status import IN_PROGRESS, DocumentStatus, ensure_transition
@@ -58,7 +59,14 @@ class Document(models.Model):
     )
     source_type = models.CharField(max_length=20, blank=True)
     source_text = models.TextField(blank=True)
-    pages = models.JSONField(default=list, blank=True)
+    pages = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Page offsets into source_text; OCR pages also carry word boxes/confidence.",
+    )
+    metadata = models.JSONField(
+        default=dict, blank=True, help_text="Parser metadata (page count, attachments, OCR)."
+    )
     error = models.TextField(blank=True)
     routing_reasons = models.JSONField(default=list, blank=True)
     uploaded_by = models.ForeignKey(
@@ -93,12 +101,38 @@ class Document(models.Model):
             setattr(self, name, value)
         self.save(update_fields=["status", "updated_at", *fields])
 
+    @property
+    def ocr_confidence(self) -> float | None:
+        value = self.metadata.get("ocr_confidence")
+        return float(value) if value is not None else None
+
     def parsed_document(self) -> ParsedDocument:
         pages = tuple(
-            Page(p["number"], self.source_text[p["start"] : p["end"]], p["start"], p["end"])
+            Page(
+                p["number"],
+                self.source_text[p["start"] : p["end"]],
+                p["start"],
+                p["end"],
+                words=tuple(_word_from_json(w) for w in p.get("words", ())),
+                ocr_confidence=p.get("ocr_confidence"),
+            )
             for p in self.pages
         )
-        return ParsedDocument(pages=pages, source_type=self.source_type)
+        return ParsedDocument(pages=pages, source_type=self.source_type, metadata=self.metadata)
+
+    @staticmethod
+    def pages_json(parsed: ParsedDocument) -> list[dict[str, Any]]:
+        """Serialise pages; OCR words become compact ``[start, end, conf, *box]`` lists."""
+        pages: list[dict[str, Any]] = []
+        for page in parsed.pages:
+            data: dict[str, Any] = {"number": page.number, "start": page.start, "end": page.end}
+            if page.ocr_confidence is not None:
+                data["ocr_confidence"] = round(page.ocr_confidence, 2)
+                data["words"] = [
+                    [w.start, w.end, round(w.confidence, 3), *(w.box or ())] for w in page.words
+                ]
+            pages.append(data)
+        return pages
 
 
 class ExtractionRun(models.Model):
@@ -115,6 +149,9 @@ class ExtractionRun(models.Model):
     output_tokens = models.PositiveIntegerField(default=0)
     latency_ms = models.PositiveIntegerField(default=0)
     error = models.TextField(blank=True)
+    examples = models.JSONField(
+        default=list, blank=True, help_text="Verified documents used as few-shot examples."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -253,6 +290,49 @@ class ValidationIssue(models.Model):
     @property
     def rank(self) -> int:
         return self.SEVERITY_ORDER[Severity(self.severity)]
+
+
+class FieldReview(models.Model):
+    """One scalar field of an invoice a person approved: extracted vs. approved value.
+
+    Written when a reviewer approves (auto-approved invoices were never checked, so they
+    are not evidence either way). Rows with ``corrected=True`` are the reviewer's
+    corrections; all rows together measure accuracy - the share of fields accepted
+    unchanged - and recent rows per vendor become few-shot examples for extraction.
+    """
+
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name="field_reviews")
+    vendor = models.ForeignKey(
+        Vendor, null=True, blank=True, on_delete=models.SET_NULL, related_name="field_reviews"
+    )
+    vendor_name = models.CharField(max_length=255, blank=True)
+    field = models.CharField(max_length=40, db_index=True)
+    extracted_value = models.TextField(blank=True, help_text="'' = not found by the model.")
+    approved_value = models.TextField(blank=True)
+    corrected = models.BooleanField(default=False, db_index=True)
+    extracted_confidence = models.FloatField(null=True, blank=True)
+    evidence_quote = models.TextField(
+        blank=True, help_text="Where the approved value is printed on the document."
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    reviewed_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        ordering = ["-reviewed_at", "document_id", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["document", "field"], name="one_review_per_field")
+        ]
+
+    def __str__(self) -> str:
+        change = f"{self.extracted_value!r} -> {self.approved_value!r}" if self.corrected else "ok"
+        return f"#{self.document_id} {self.field}: {change}"
+
+
+def _word_from_json(data: list[Any]) -> OcrWord:
+    start, end, confidence, *box = data
+    return OcrWord(start, end, confidence, (box[0], box[1], box[2], box[3]) if box else None)
 
 
 def _evidence_dict(stored: dict[str, Any]) -> dict[str, Any] | None:

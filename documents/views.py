@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -17,9 +18,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from documents import services
+from documents.accuracy import build_report
+from documents.charts import timeline_chart
 from documents.forms import ReviewDecisionForm, UploadForm
-from documents.highlight import evidence_spans, highlight_pages
-from documents.models import Document, Invoice
+from documents.highlight import evidence_spans, highlight_pages, uncertain_words
+from documents.models import Document, FieldReview, Invoice
 from documents.tasks import enqueue_processing
 from extraction.status import IN_PROGRESS, DocumentStatus
 
@@ -192,10 +195,14 @@ def _review_context(document: Document) -> dict[str, Any]:
     }
     line_items = list(invoice.line_items.all()) if invoice else []
     spans = evidence_spans(invoice.evidence if invoice else {}, [li.evidence for li in line_items])
+    threshold = settings.DOCEXTRACT["REVIEW_CONFIDENCE_THRESHOLD"]
+    uncertain = uncertain_words(document.pages, threshold)
     context |= {
         "fields": _field_rows(document, invoice) if invoice else [],
         "line_items": line_items,
-        "pages": highlight_pages(document.source_text, document.pages, spans),
+        "pages": highlight_pages(document.source_text, document.pages, spans, uncertain),
+        "uncertain_word_count": len(uncertain),
+        "is_image": document.content_type.startswith("image/"),
     }
     return context
 
@@ -276,3 +283,21 @@ def document_file(request: HttpRequest, pk: int) -> FileResponse:
         filename=document.original_filename,
         content_type=document.content_type or "application/octet-stream",
     )
+
+
+# --- accuracy dashboard -------------------------------------------------------------
+@login_required
+def accuracy(request: HttpRequest) -> HttpResponse:
+    vendor = request.GET.get("vendor", "").strip()
+    report = build_report(vendor=vendor or None)
+    corrections = FieldReview.objects.filter(corrected=True).select_related("document")
+    if vendor:
+        corrections = corrections.filter(vendor_name__icontains=vendor)
+    context = {
+        "report": report,
+        "vendor": vendor,
+        "chart": timeline_chart(report.timeline),
+        "corrections": corrections[:12],
+        "field_labels": FIELD_LABELS,
+    }
+    return render(request, "documents/accuracy.html", context)

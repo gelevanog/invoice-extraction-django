@@ -1,0 +1,110 @@
+{% extends "documents/base.html" %}
+{% load docextract %}
+{% block title %}Extraction accuracy{% endblock %}
+{% block content %}
+<div class="detail-header">
+  <div>
+    <h1>Extraction accuracy</h1>
+    <p class="muted small">Share of extracted fields that reviewers approved unchanged. Only invoices a person approved count; auto-approved ones were never checked.</p>
+  </div>
+  <form method="get" class="filters">
+    <input type="search" name="vendor" value="{{ vendor }}" placeholder="Filter by vendor" aria-label="Vendor">
+    <button type="submit" class="small secondary outline">Apply</button>
+  </form>
+</div>
+
+<section class="stat-row">
+  <div class="stat stat-hero"><span class="stat-value">{{ report.overall.rate|percent }}</span><span class="stat-label">Fields accepted unchanged</span></div>
+  <div class="stat"><span class="stat-value">{{ report.invoices_reviewed }}</span><span class="stat-label">Invoices reviewed</span></div>
+  <div class="stat"><span class="stat-value">{{ report.overall.reviewed }}</span><span class="stat-label">Fields reviewed</span></div>
+  <div class="stat"><span class="stat-value">{{ report.overall.corrected }}</span><span class="stat-label">Corrections (used as few-shot examples)</span></div>
+  <div class="stat"><span class="stat-value">{{ report.auto_approved }}</span><span class="stat-label">Auto-approved (not counted)</span></div>
+  <a class="stat" href="{% url 'api:accuracy' %}{% if vendor %}?vendor={{ vendor|urlencode }}{% endif %}"><span class="stat-value">JSON</span><span class="stat-label">/api/accuracy/</span></a>
+</section>
+
+{% if not report.overall.reviewed %}
+<article class="card empty">
+  <p><strong>No reviewed invoices yet.</strong></p>
+  <p class="muted">Approve documents in the <a href="{% url 'documents:queue' %}">review queue</a>; every approval records which fields were accepted and which were corrected.</p>
+</article>
+{% else %}
+<article class="card">
+  <header class="card-header">
+    <h3>Over time</h3>
+    <span class="legend small">
+      <span class="key key-bar"></span> fields accepted, per reviewed invoice
+      <span class="key key-line"></span> cumulative accuracy
+    </span>
+  </header>
+  {% with c=chart %}
+  <svg class="timeline" viewBox="0 0 {{ c.width }} {{ c.height }}" role="img" aria-label="Accuracy per reviewed invoice and cumulative accuracy; values are listed in the tables below">
+    {% for tick in c.ticks %}
+    <line class="grid" x1="{{ c.plot_left }}" x2="{{ c.plot_right }}" y1="{{ tick.y }}" y2="{{ tick.y }}"></line>
+    <text class="axis" x="{{ c.plot_left|add:'-8' }}" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle">{{ tick.label }}</text>
+    {% endfor %}
+    {% for col in c.columns %}
+    <g class="band">
+      <title>{{ col.title }}</title>
+      <rect class="hit" x="{{ col.hit_x }}" y="0" width="{{ col.hit_width }}" height="{{ c.baseline }}"></rect>
+      {% if col.path %}<path class="column" d="{{ col.path }}"></path>{% endif %}
+      {% if col.label %}<text class="axis" x="{{ col.label_x }}" y="{{ c.height|add:'-10' }}" text-anchor="middle">{{ col.label }}</text>{% endif %}
+    </g>
+    {% endfor %}
+    <polyline class="cumulative" points="{{ c.line }}"></polyline>
+    <circle class="end-dot" cx="{{ c.end_x }}" cy="{{ c.end_y }}" r="4"></circle>
+    <text class="end-label" x="{{ c.end_x|add:'8' }}" y="{{ c.end_y }}" dominant-baseline="middle">{{ c.end_label }}</text>
+  </svg>
+  {% endwith %}
+</article>
+
+<div class="accuracy-grid">
+  <article class="card">
+    <header class="card-header"><h3>By field</h3><span class="muted small">where the extractor needs help</span></header>
+    <table class="accuracy-table">
+      <thead><tr><th>Field</th><th class="num">Reviewed</th><th class="num">Corrected</th><th>Accepted unchanged</th></tr></thead>
+      <tbody>
+      {% for row in report.by_field %}
+        <tr><td>{{ field_labels|get_item:row.key|default:row.key }}</td><td class="num">{{ row.reviewed }}</td><td class="num">{{ row.corrected }}</td>
+          <td><span class="meter"><span style="width: {{ row.rate|percent_width }}%"></span></span> <span class="meter-num">{{ row.rate|percent }}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </article>
+  <article class="card">
+    <header class="card-header"><h3>By vendor</h3><span class="muted small">few-shot examples are chosen per vendor</span></header>
+    <table class="accuracy-table">
+      <thead><tr><th>Vendor</th><th class="num">Fields</th><th class="num">Corrected</th><th>Accepted unchanged</th></tr></thead>
+      <tbody>
+      {% for row in report.by_vendor %}
+        <tr><td><a href="?vendor={{ row.key|urlencode }}">{{ row.key }}</a></td><td class="num">{{ row.reviewed }}</td><td class="num">{{ row.corrected }}</td>
+          <td><span class="meter"><span style="width: {{ row.rate|percent_width }}%"></span></span> <span class="meter-num">{{ row.rate|percent }}</span></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </article>
+</div>
+
+<article class="card">
+  <header class="card-header"><h3>Recent corrections</h3><span class="muted small">what reviewers changed before approving</span></header>
+  {% if corrections %}
+  <div class="table-scroll">
+  <table class="accuracy-table">
+    <thead><tr><th>Reviewed</th><th>Document</th><th>Vendor</th><th>Field</th><th>Extracted</th><th>Approved</th></tr></thead>
+    <tbody>
+    {% for c in corrections %}
+      <tr>
+        <td class="nowrap">{{ c.reviewed_at|date:"Y-m-d H:i" }}</td>
+        <td><a href="{% url 'documents:detail' c.document_id %}">{{ c.document.original_filename }}</a></td>
+        <td>{{ c.vendor_name }}</td>
+        <td>{{ field_labels|get_item:c.field|default:c.field }}</td>
+        <td class="mono">{% if c.extracted_value %}<s>{{ c.extracted_value }}</s>{% else %}<span class="missing">not found</span>{% endif %}</td>
+        <td class="mono">{{ c.approved_value|default:"-" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="muted">Every reviewed field was accepted unchanged.</p>{% endif %}
+</article>
+{% endif %}
+{% endblock %}

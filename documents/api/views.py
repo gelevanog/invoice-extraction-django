@@ -16,14 +16,17 @@ from rest_framework.response import Response
 from rest_framework.serializers import BaseSerializer
 
 from documents import services
+from documents.accuracy import build_report
 from documents.api.serializers import (
+    AccuracyReportSerializer,
     DocumentListSerializer,
     DocumentSerializer,
     DocumentUploadSerializer,
+    FieldReviewSerializer,
     InvoiceSerializer,
     ReviewDecisionSerializer,
 )
-from documents.models import Document, Invoice
+from documents.models import Document, FieldReview, Invoice
 from documents.tasks import enqueue_processing
 from extraction.status import DocumentStatus
 
@@ -193,3 +196,35 @@ def export_invoices(request: Request, fmt: str) -> HttpResponse:
             )  # fmt: skip
     response["Content-Disposition"] = f'attachment; filename="invoices-{stamp}.{fmt}"'
     return response
+
+
+@extend_schema(
+    parameters=[OpenApiParameter("vendor", str, description="Vendor name contains")],
+    responses=AccuracyReportSerializer,
+)
+@api_view(["GET"])
+def accuracy(request: Request) -> Response:
+    """Share of extracted fields reviewers approved unchanged: overall, per field, per
+    vendor and per reviewed invoice over time. Auto-approved invoices are not counted."""
+    report = build_report(vendor=request.query_params.get("vendor") or None)
+    return Response(AccuracyReportSerializer(report).data)
+
+
+@extend_schema(
+    parameters=[
+        OpenApiParameter("vendor", str, description="Vendor name contains"),
+        OpenApiParameter("field", str, description="Field name, e.g. invoice_number"),
+    ]
+)
+class CorrectionViewSet(viewsets.ReadOnlyModelViewSet):
+    """Reviewer corrections (extracted vs. approved value); these feed few-shot prompts."""
+
+    serializer_class = FieldReviewSerializer
+
+    def get_queryset(self) -> QuerySet[FieldReview]:
+        queryset = FieldReview.objects.filter(corrected=True)
+        if vendor := self.request.query_params.get("vendor"):
+            queryset = queryset.filter(vendor_name__icontains=vendor)
+        if field := self.request.query_params.get("field"):
+            queryset = queryset.filter(field=field)
+        return queryset

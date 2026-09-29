@@ -7,7 +7,7 @@ import pytest
 from django.test import Client
 
 from documents.batch import import_folder
-from documents.highlight import highlight_pages
+from documents.highlight import highlight_pages, uncertain_words
 from documents.models import Document
 
 pytestmark = pytest.mark.django_db
@@ -20,8 +20,8 @@ def client_logged_in(client: Client, reviewer: Any) -> Client:
 
 
 @pytest.fixture
-def docs(demo_vendors: Any, sample_dir: Path) -> dict[str, Document]:
-    report = import_folder(sample_dir)
+def docs(demo_vendors: Any, text_sample_dir: Path) -> dict[str, Document]:
+    report = import_folder(text_sample_dir)
     return {item.path.name[:2]: item.document for item in report.items if item.document}
 
 
@@ -133,3 +133,19 @@ def test_highlight_handles_overlapping_spans_and_escaping() -> None:
     assert "&lt;b&gt;" in html  # source text is escaped
     assert '<mark class="evidence" data-fields="currency total">EUR</mark>' in html
     assert html.count("<mark") == 3
+
+
+def test_highlight_underlines_uncertain_ocr_words_inside_evidence() -> None:
+    text = "Total 178.5O"
+    pages = [{"number": 1, "start": 0, "end": 12, "ocr_confidence": 0.7,
+              "words": [[0, 5, 0.96, 0, 0, 50, 10], [6, 12, 0.41, 60, 0, 60, 10]]}]  # fmt: skip
+    uncertain = uncertain_words(pages, threshold=0.75)
+    assert [(w.start, w.end) for w in uncertain] == [(6, 12)]
+
+    view = highlight_pages(text, pages, {"total": (0, 12)}, uncertain)[0]
+    assert view.ocr_confidence == 0.7
+    assert str(view.html) == (
+        '<mark class="evidence" data-fields="total">Total </mark>'
+        '<mark class="evidence" data-fields="total">'
+        '<span class="ocr-low" title="OCR confidence 0.41">178.5O</span></mark>'
+    )
