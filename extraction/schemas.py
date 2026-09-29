@@ -37,8 +37,10 @@ class Extracted[T](BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    # Required (but nullable): a model that forgets the key gets a validation error and
+    # another attempt, instead of the omission silently meaning "not on the document".
     value: T | None = Field(
-        default=None, description="The normalized value, or null if absent from the document."
+        description="The normalized value, or null if absent from the document."
     )
     confidence: float = Field(
         ge=0.0,

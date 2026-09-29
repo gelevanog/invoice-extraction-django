@@ -1,12 +1,22 @@
-"""OpenAI provider using Chat Completions with a JSON-schema response format."""
+"""OpenAI provider using Chat Completions with a JSON-schema response format.
+
+Also the base for OpenAI-compatible APIs (see :mod:`extraction.llm.openrouter_provider`).
+"""
 
 from __future__ import annotations
 
+from typing import Any
+
 import openai
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import (
+    ChatCompletionContentPartImageParam,
+    ChatCompletionContentPartTextParam,
+    ChatCompletionMessageParam,
+)
 from openai.types.shared_params import ResponseFormatJSONSchema
 
-from extraction.llm.base import JsonRequest, LLMError, LLMResponse
+from extraction.llm.base import ChatMessage, JsonRequest, LLMError, LLMResponse, Throttle
+from extraction.llm.schema import portable_json_schema
 
 DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
 
@@ -20,33 +30,48 @@ class OpenAIProvider:
         api_key: str | None = None,
         timeout: float = 120.0,
         client: openai.OpenAI | None = None,
+        *,
+        max_retries: int = 2,
+        min_interval: float = 0.0,
+        extra_body: dict[str, Any] | None = None,
     ) -> None:
         self.model = model
-        self._client = client or openai.OpenAI(api_key=api_key, timeout=timeout)
+        # The SDK retries 429/5xx/connection errors with exponential backoff and honours
+        # Retry-After; ``max_retries`` sets how many times.
+        self._client = client or openai.OpenAI(
+            api_key=api_key, timeout=timeout, max_retries=max_retries
+        )
+        self._throttle = Throttle(min_interval)
+        self._extra_body = extra_body
 
     def complete_json(self, request: JsonRequest) -> LLMResponse:
         messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": request.system}]
         for message in request.messages:
             if message.role == "user":
-                messages.append({"role": "user", "content": message.content})
+                messages.append({"role": "user", "content": _user_content(message)})
             else:
                 messages.append({"role": "assistant", "content": message.content})
         # Non-strict: strict mode requires every property to be required, which does not
-        # fit optional fields. Pydantic validation + the retry loop enforce the schema.
+        # fit optional fields. The portable schema (refs inlined, value constraints
+        # dropped) is accepted by OpenAI-compatible gateways too; Pydantic validation +
+        # the retry loop enforce the full schema.
         response_format: ResponseFormatJSONSchema = {
             "type": "json_schema",
             "json_schema": {
                 "name": request.schema.__name__,
-                "schema": request.schema.model_json_schema(),
+                "schema": portable_json_schema(request.schema),
                 "strict": False,
             },
         }
+        options: dict[str, Any] = {"extra_body": self._extra_body} if self._extra_body else {}
+        self._throttle.wait()
         try:
             response = self._client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_completion_tokens=request.max_tokens,
                 response_format=response_format,
+                **options,
             )
         except openai.APIConnectionError as exc:
             raise LLMError(f"OpenAI connection error: {exc}") from exc
@@ -55,6 +80,8 @@ class OpenAIProvider:
         except openai.APIStatusError as exc:
             raise LLMError(f"OpenAI API error {exc.status_code}: {exc.message}") from exc
 
+        if not response.choices:  # some gateways report upstream errors in a 200 body
+            raise LLMError(f"No completion returned: {getattr(response, 'error', None)}")
         choice = response.choices[0]
         if choice.finish_reason == "length":
             raise LLMError(f"Output truncated at max_completion_tokens={request.max_tokens}")
@@ -69,3 +96,19 @@ class OpenAIProvider:
             output_tokens=usage.completion_tokens if usage else 0,
             metadata={"finish_reason": str(choice.finish_reason)},
         )
+
+
+def _user_content(
+    message: ChatMessage,
+) -> str | list[ChatCompletionContentPartImageParam | ChatCompletionContentPartTextParam]:
+    if not message.images:
+        return message.content
+    parts: list[ChatCompletionContentPartImageParam | ChatCompletionContentPartTextParam] = [
+        {
+            "type": "image_url",
+            "image_url": {"url": f"data:{image.media_type};base64,{image.base64()}"},
+        }
+        for image in message.images
+    ]
+    parts.append({"type": "text", "text": message.content})
+    return parts

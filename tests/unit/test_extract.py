@@ -242,3 +242,15 @@ def test_openai_provider_raises_on_truncation() -> None:
     client = SimpleNamespace(chat=SimpleNamespace(completions=_Recorder(completion)))
     with pytest.raises(LLMError, match="truncated"):
         OpenAIProvider(client=client).complete_json(_request())  # type: ignore[arg-type]
+
+
+def test_omitted_value_key_is_an_error_not_a_silent_null() -> None:
+    # Seen with a real model: evidence quoted, "value" key left out entirely.
+    forgetful = valid_payload()
+    forgetful["currency"] = {"confidence": 1.0, "evidence": {"quote": "Total EUR 10.00"}}
+    provider = ScriptedProvider(json.dumps(forgetful), json.dumps(valid_payload()))
+
+    result = extract_structured(DOC, Invoice, provider)
+
+    assert result.attempts[0].error == "- currency.value: Field required"
+    assert result.data is not None and result.data.currency.value == "EUR"

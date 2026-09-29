@@ -8,6 +8,13 @@ output. It understands two schemas: :class:`~extraction.schemas.Invoice` and
 
 Confidence scores mimic what a calibrated model would report: high for explicitly
 labeled values, lower for values inferred from position or unlabeled references.
+
+Few-shot examples are honoured deterministically: from each verified example value and
+its evidence quote the reader learns the label printed before the value (e.g.
+"Document no." or "Tax point") and reads the value after the same label in the new
+document - roughly what a real model takes away from a verified example. A learned
+label fills fields the heuristics missed or were unsure about; for fields a reviewer
+had to correct it also overrides a confident heuristic reading.
 """
 
 from __future__ import annotations
@@ -15,11 +22,13 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from decimal import Decimal
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from extraction.currencies import CURRENCY_SYMBOLS, ISO_4217_CODES
 from extraction.enrich.categorize import KeywordCategorizer, LineItemCategories
+from extraction.evidence import value_renderings
 from extraction.llm.base import JsonRequest, LLMError, LLMResponse
 from extraction.normalize import parse_amount, parse_date
 from extraction.schemas import Invoice
@@ -28,6 +37,10 @@ FAKE_MODEL = "fake-heuristic-v1"
 
 _PAGE_RE = re.compile(r'<page number="(\d+)">\n(.*?)\n</page>', re.DOTALL)
 _ITEMS_RE = re.compile(r"<items>\n(.*?)\n</items>", re.DOTALL)
+_EXAMPLE_RE = re.compile(r'<example source="[^"]*">\n(.*?)\n</example>', re.DOTALL)
+LEARNED_CONFIDENCE = 0.9
+DATE_FIELDS = frozenset({"issue_date", "due_date"})
+AMOUNT_FIELDS = frozenset({"subtotal", "tax", "total"})
 _AMOUNT = r"-?[\d][\d.,]*"
 _LEGAL_FORM = re.compile(
     r"\b(GmbH|AG|Ltd\.?|Limited|LLC|Inc\.?|Corp\.?|B\.V\.|BV|N\.V\.|S\.A\.|SAS|S\.r\.l\.|plc)\b",
@@ -59,7 +72,8 @@ class FakeProvider:
     def complete_json(self, request: JsonRequest) -> LLMResponse:
         prompt = request.messages[0].content
         if request.schema is Invoice:
-            payload = HeuristicInvoiceReader(_pages_from_prompt(prompt)).read()
+            reader = HeuristicInvoiceReader(_pages_from_prompt(prompt), learned_labels(prompt))
+            payload = reader.read()
         elif request.schema is LineItemCategories:
             payload = self._categorize(prompt)
         else:
@@ -92,37 +106,94 @@ def _pages_from_prompt(prompt: str) -> list[tuple[int, str]]:
     return pages
 
 
+@dataclass(frozen=True, slots=True)
+class LearnedLabel:
+    label: str  # text printed before the value, e.g. "Document no."
+    corrected: bool  # a reviewer had to fix this field on the example document
+
+
+def learned_labels(prompt: str) -> dict[str, LearnedLabel]:
+    """Field -> label printed before its value, from the verified examples in a prompt."""
+    labels: dict[str, LearnedLabel] = {}
+    for match in _EXAMPLE_RE.finditer(prompt):
+        record = json.loads(match.group(1))
+        for name, entry in record.items():
+            if name in labels or not isinstance(entry, dict):
+                continue
+            if label := _label_before_value(entry.get("evidence"), entry.get("value")):
+                labels[name] = LearnedLabel(label, "reviewer_corrected_from" in entry)
+    return labels
+
+
+def _label_before_value(quote: object, value: object) -> str | None:
+    if not isinstance(quote, str) or value is None:
+        return None
+    for rendering in value_renderings(_typed(str(value))):
+        index = quote.lower().find(rendering.lower())
+        if index > 0:
+            return quote[:index].strip(" :#") or None
+    return None
+
+
+def _typed(text: str) -> object:
+    """Examples carry values as text; recover dates and amounts to render them."""
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        pass
+    if re.fullmatch(r"-?\d+\.\d{2}", text):
+        try:
+            return Decimal(text)
+        except InvalidOperation:
+            pass
+    return text
+
+
 class HeuristicInvoiceReader:
     """Regex/label based invoice reader producing ``Invoice``-shaped JSON."""
 
-    def __init__(self, pages: list[tuple[int, str]]) -> None:
+    def __init__(
+        self, pages: list[tuple[int, str]], learned: dict[str, LearnedLabel] | None = None
+    ) -> None:
         self.lines = [_Line(number, line) for number, text in pages for line in text.splitlines()]
+        self.learned = learned or {}
 
     # -- public -------------------------------------------------------------------
     def read(self) -> dict[str, Any]:
-        currency = self._currency()
-        return {
-            "vendor_name": self._field(self._vendor_name()),
-            "vendor_tax_id": self._field(self._tax_id()),
-            "invoice_number": self._field(self._invoice_number()),
-            "issue_date": self._date_field(self._issue_date()),
-            "due_date": self._date_field(
-                self._labeled(r"(?:due\s+date|payment\s+due|due\s+by|pay\s+by)", 0.95)
+        hits = {
+            "vendor_name": self._vendor_name(),
+            "vendor_tax_id": self._tax_id(),
+            "invoice_number": self._invoice_number(),
+            "issue_date": self._issue_date(),
+            "due_date": self._labeled(r"(?:due\s+date|payment\s+due|due\s+by|pay\s+by)", 0.95),
+            "currency": self._currency(),
+            "subtotal": self._amount_line(
+                r"(?:sub\s*-?total|net\s+amount|net\s+total|total\s+net)"
             ),
-            "currency": self._field(currency),
-            "subtotal": self._amount_field(
-                self._amount_line(r"(?:sub\s*-?total|net\s+amount|net\s+total|total\s+net)")
+            "tax": self._amount_line(r"(?:VAT|tax|sales\s+tax|GST)(?!\s*(?:ID|No|number|reg))"),
+            "total": self._amount_line(
+                r"(?:total\s+due|total\s+amount|amount\s+due|grand\s+total|total)(?!\s+net)"
             ),
-            "tax": self._amount_field(
-                self._amount_line(r"(?:VAT|tax|sales\s+tax|GST)(?!\s*(?:ID|No|number|reg))")
-            ),
-            "total": self._amount_field(
-                self._amount_line(
-                    r"(?:total\s+due|total\s+amount|amount\s+due|grand\s+total|total)(?!\s+net)"
-                )
-            ),
-            "line_items": self._line_items(),
         }
+        for name, learned in self.learned.items():
+            if name not in hits:
+                continue
+            current = hits[name]
+            confident = current is not None and current.confidence >= LEARNED_CONFIDENCE
+            if confident and not learned.corrected:
+                continue  # heuristics agree with what reviewers accepted before
+            pattern = r"\s+".join(re.escape(token) for token in learned.label.split())
+            hits[name] = self._labeled(pattern, LEARNED_CONFIDENCE) or current
+
+        fields: dict[str, Any] = {}
+        for name, hit in hits.items():
+            if name in DATE_FIELDS:
+                fields[name] = self._date_field(hit)
+            elif name in AMOUNT_FIELDS:
+                fields[name] = self._amount_field(hit)
+            else:
+                fields[name] = self._field(hit)
+        return {**fields, "line_items": self._line_items()}
 
     # -- field finders ------------------------------------------------------------
     def _labeled(self, label: str, confidence: float, value: str = r"(.+?)") -> _Hit | None:

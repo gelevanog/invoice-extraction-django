@@ -6,7 +6,7 @@ stage methods one by one; scripts and notebooks can simply call :meth:`run`.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
@@ -17,10 +17,12 @@ from extraction.enrich import EnrichmentResult, enrich_invoice
 from extraction.enrich.categorize import Categorizer, KeywordCategorizer
 from extraction.enrich.fx import FxRatesProvider, StaticFxRatesProvider
 from extraction.enrich.vendors import VendorMatcher, VendorRecord
-from extraction.evidence import Span, resolve_invoice_evidence
-from extraction.extract import ExtractionResult, extract_structured
+from extraction.evidence import Span, cap_confidence_to_ocr, resolve_invoice_evidence
+from extraction.extract import ExtractionResult, FewShotExample, extract_structured
 from extraction.issues import Issue
 from extraction.llm.base import LLMProvider
+from extraction.ocr.base import OcrEngine
+from extraction.ocr.images import DEFAULT_DPI
 from extraction.parse import ParsedDocument, ParseError, parse_document
 from extraction.route import RoutingConfig, RoutingDecision, route
 from extraction.schemas import Invoice
@@ -36,6 +38,9 @@ from extraction.validate import (
 
 logger = structlog.get_logger(__name__)
 
+# Returns verified records from earlier documents of the same vendor, most relevant first.
+ExampleSource = Callable[[ParsedDocument], Sequence[FewShotExample]]
+
 
 @dataclass(frozen=True, slots=True)
 class PipelineConfig:
@@ -45,6 +50,8 @@ class PipelineConfig:
     validation: ValidationConfig = field(default_factory=ValidationConfig)
     routing: RoutingConfig = field(default_factory=RoutingConfig)
     checks: tuple[Check, ...] = DEFAULT_CHECKS
+    ocr_dpi: int = DEFAULT_DPI
+    max_example_chars: int = 4000
 
 
 @dataclass(slots=True)
@@ -74,6 +81,8 @@ class InvoicePipeline:
         vendors: Callable[[], Iterable[VendorRecord]] = lambda: (),
         duplicate_lookup: DuplicateLookup | None = None,
         today: Callable[[], date] = date.today,
+        ocr: OcrEngine | None = None,
+        examples: ExampleSource | None = None,
     ) -> None:
         self.provider = provider
         self.config = config or PipelineConfig()
@@ -82,15 +91,28 @@ class InvoicePipeline:
         self._vendors = vendors
         self._duplicate_lookup = duplicate_lookup
         self._today = today
+        self.ocr = ocr
+        self._examples = examples
 
     # -- stages -------------------------------------------------------------------
     def parse(self, filename: str, data: bytes) -> ParsedDocument:
-        return parse_document(filename, data)
+        return parse_document(filename, data, ocr=self.ocr, dpi=self.config.ocr_dpi)
 
     def extract(self, document: ParsedDocument) -> ExtractionResult[Invoice]:
-        return extract_structured(
-            document, Invoice, self.provider, max_attempts=self.config.max_attempts
+        """LLM extraction; for OCR text, confidences are then capped by word confidence."""
+        result = extract_structured(
+            document,
+            Invoice,
+            self.provider,
+            max_attempts=self.config.max_attempts,
+            examples=self._examples(document) if self._examples else (),
+            max_example_chars=self.config.max_example_chars,
         )
+        if result.data is not None and document.is_ocr:
+            spans = resolve_invoice_evidence(result.data, document)
+            capped = cap_confidence_to_ocr(result.data, spans)
+            logger.info("extract.ocr_confidence_capped", fields=capped)
+        return result
 
     def validate(
         self, invoice: Invoice, document: ParsedDocument
@@ -101,6 +123,12 @@ class InvoicePipeline:
             today=self._today(),
             duplicate_lookup=self._duplicate_lookup,
             evidence_spans=spans,
+            ocr_page_confidence={
+                page.number: page.ocr_confidence
+                for page in document.pages
+                if page.ocr_confidence is not None
+            },
+            ocr_engine=document.metadata.get("ocr_engine"),
         )
         return validate_invoice(invoice, context, self.config.checks), spans
 

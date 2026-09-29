@@ -16,9 +16,12 @@ dependencies = [
     "gunicorn>=26.2.0",
     "httpx>=0.28.1",
     "openai>=3.19.2",
+    "pillow>=12.3.0",
     "psycopg[binary]>=3.2",
     "pydantic>=2.13.5",
     "pypdf>=6.19.0",
+    "pypdfium2>=5.13.0",
+    "pytesseract>=0.3.13",
     "rapidfuzz>=3.14.6",
     "rich>=15.0.0",
     "structlog>=26.1.0",
@@ -41,6 +44,9 @@ package = false
 DJANGO_SETTINGS_MODULE = "config.settings"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = [
+    "requires_tesseract: needs the tesseract binary; skipped when missing (CI sets REQUIRE_TESSERACT=true)",
+]
 filterwarnings = [
     "ignore::DeprecationWarning:celery.*",
     "ignore:No directory at:UserWarning",  # whitenoise before collectstatic

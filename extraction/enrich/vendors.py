@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal
@@ -74,6 +75,27 @@ class VendorMatcher:
         _, score, key = best
         vendor, alias = self._owners[key]
         return VendorMatch(vendor, round(float(score), 1), "fuzzy", alias)
+
+    def find_in_text(self, text: str) -> VendorRecord | None:
+        """Identify a known vendor in raw document text, before any extraction.
+
+        Used to pick few-shot examples for the extraction prompt. A printed tax ID wins;
+        otherwise the longest vendor name or alias that appears as whole words in a
+        line (after the same normalization as :meth:`match`).
+        """
+        compact_text = _compact(text)
+        for tax_id, vendor in self._by_tax_id.items():
+            if tax_id in compact_text:
+                return vendor
+        lines = [normalize_company_name(line) for line in text.splitlines() if line.strip()]
+        best: tuple[int, VendorRecord] | None = None
+        for key, name in self._choices.items():
+            if len(name) < 4 or (best is not None and len(name) <= best[0]):
+                continue
+            pattern = re.compile(rf"\b{re.escape(name)}\b")
+            if any(pattern.search(line) for line in lines):
+                best = (len(name), self._owners[key][0])
+        return best[1] if best else None
 
 
 def same_vendor(

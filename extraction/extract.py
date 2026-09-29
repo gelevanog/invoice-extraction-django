@@ -4,13 +4,20 @@ The model is asked for JSON matching a Pydantic schema. If the output does not p
 or fails validation, the exact validation errors are sent back as a follow-up turn and
 the model gets another attempt (up to ``max_attempts``). Every attempt is recorded so
 the Django layer can persist raw output, tokens and latency for auditing.
+
+Optionally the prompt carries few-shot examples: records a person verified on earlier
+documents from the same sender (see :class:`FewShotExample`). They are bounded by a
+character budget, rendered as data inside their own block, and come after the stable
+instructions and schema so the prompt prefix stays cacheable.
 """
 
 from __future__ import annotations
 
 import json
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 import structlog
 from pydantic import BaseModel, ValidationError
@@ -47,11 +54,53 @@ def render_document(document: ParsedDocument) -> str:
     return f"<document>\n{pages}\n</document>"
 
 
-def build_user_prompt(document: ParsedDocument, schema: type[BaseModel]) -> str:
+@dataclass(frozen=True, slots=True)
+class FewShotExample:
+    """A record a person verified on an earlier document, shown to the model as guidance."""
+
+    source: str  # audit reference, e.g. "document #12"
+    record: dict[str, Any]  # JSON-serialisable verified values and where they were printed
+
+
+EXAMPLES_INTRO = """\
+Records a person verified on earlier documents from the same sender, most relevant \
+first. Use them to learn where this sender prints each value and how to read it; a \
+"reviewer_corrected_from" entry shows a value that was extracted wrongly before. They \
+describe other documents: never copy their values - every value must come from the \
+document below."""
+
+
+def render_examples(
+    examples: Sequence[FewShotExample], max_chars: int
+) -> tuple[str, list[FewShotExample]]:
+    """Render as many examples as fit in ``max_chars``; return the block and those used."""
+    used: list[FewShotExample] = []
+    parts: list[str] = []
+    budget = max_chars - len(EXAMPLES_INTRO)
+    for example in examples:
+        rendered = (
+            f'<example source="{example.source}">\n'
+            f"{json.dumps(example.record, ensure_ascii=False, sort_keys=True)}\n</example>"
+        )
+        if len(rendered) > budget:
+            break
+        budget -= len(rendered)
+        parts.append(rendered)
+        used.append(example)
+    if not used:
+        return "", []
+    body = "\n".join(parts)
+    return f"<verified_examples>\n{EXAMPLES_INTRO}\n{body}\n</verified_examples>", used
+
+
+def build_user_prompt(
+    document: ParsedDocument, schema: type[BaseModel], examples_block: str = ""
+) -> str:
+    examples = f"{examples_block}\n\n" if examples_block else ""
     return (
         f"Extract a `{schema.__name__}` record from the document below.\n\n"
         f"JSON schema:\n{json.dumps(schema.model_json_schema(), separators=(',', ':'))}\n\n"
-        f"{render_document(document)}"
+        f"{examples}{render_document(document)}"
     )
 
 
@@ -72,6 +121,7 @@ class ExtractionResult[M: BaseModel]:
     data: M | None = None
     attempts: list[AttemptRecord] = field(default_factory=list)
     error: str | None = None
+    examples: list[str] = field(default_factory=list)  # sources of few-shot examples used
 
     @property
     def succeeded(self) -> bool:
@@ -102,18 +152,28 @@ def extract_structured[M: BaseModel](
     max_attempts: int = 3,
     system_prompt: str = SYSTEM_PROMPT,
     max_tokens: int = 8000,
+    examples: Sequence[FewShotExample] = (),
+    max_example_chars: int = 4000,
 ) -> ExtractionResult[M]:
     """Extract ``schema`` from ``document``; retry with error feedback on invalid output.
 
     Never raises for bad model output - check ``result.succeeded``. Transport-level
     failures (:class:`LLMError`) stop the loop immediately, since re-asking will not help.
+    ``examples`` are included in order until ``max_example_chars`` is used up.
     """
     if max_attempts < 1:
         raise ValueError("max_attempts must be >= 1")
 
     result: ExtractionResult[M] = ExtractionResult(provider=provider.name, model=provider.model)
-    messages = [ChatMessage("user", build_user_prompt(document, schema))]
-    log = logger.bind(schema=schema.__name__, provider=provider.name, model=provider.model)
+    examples_block, used = render_examples(examples, max_example_chars)
+    result.examples = [example.source for example in used]
+    messages = [ChatMessage("user", build_user_prompt(document, schema, examples_block))]
+    log = logger.bind(
+        schema=schema.__name__,
+        provider=provider.name,
+        model=provider.model,
+        examples=result.examples,
+    )
 
     for attempt in range(1, max_attempts + 1):
         started = time.perf_counter()
@@ -133,7 +193,7 @@ def extract_structured[M: BaseModel](
         if response.model:
             result.model = response.model
         try:
-            result.data = schema.model_validate_json(_json_payload(response.text))
+            result.data = parse_model_output(schema, response.text)
             error = None
         except ValidationError as exc:
             error = format_validation_errors(exc)
@@ -180,6 +240,11 @@ def format_validation_errors(exc: ValidationError, limit: int = 20) -> str:
     if exc.error_count() > limit:
         lines.append(f"- ... and {exc.error_count() - limit} more errors")
     return "\n".join(lines)
+
+
+def parse_model_output[M: BaseModel](schema: type[M], text: str) -> M:
+    """Validate raw model output (as stored in the audit trail) against ``schema``."""
+    return schema.model_validate_json(_json_payload(text))
 
 
 def _json_payload(text: str) -> str:

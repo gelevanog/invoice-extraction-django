@@ -32,6 +32,7 @@ class ValidationConfig:
     amount_tolerance: Decimal = Decimal("0.02")
     max_future_days: int = 30
     earliest_plausible_date: date = date(2000, 1, 1)
+    min_ocr_confidence: float = 0.65  # mean word confidence below this = poor scan
 
 
 @dataclass(slots=True)
@@ -40,6 +41,8 @@ class ValidationContext:
     today: date = field(default_factory=date.today)
     duplicate_lookup: DuplicateLookup | None = None
     evidence_spans: dict[str, Span | None] | None = None
+    ocr_page_confidence: dict[int, float] | None = None  # page number -> mean confidence
+    ocr_engine: str | None = None
 
 
 Check = Callable[[Invoice, ValidationContext], Iterable[Issue]]
@@ -221,6 +224,28 @@ def check_evidence(invoice: Invoice, ctx: ValidationContext) -> Iterable[Issue]:
             )
 
 
+def check_ocr_quality(invoice: Invoice, ctx: ValidationContext) -> Iterable[Issue]:
+    if not ctx.ocr_page_confidence:
+        return
+    scores = ctx.ocr_page_confidence
+    pages = ", ".join(str(n) for n in scores)
+    mean = sum(scores.values()) / len(scores)
+    yield Issue(
+        "ocr_text",
+        Severity.INFO,
+        f"Page(s) {pages} read by OCR ({ctx.ocr_engine or 'unknown engine'}, mean confidence "
+        f"{mean:.2f}); each value's confidence is capped at that of the words it was read from.",
+    )
+    for number, score in scores.items():
+        if score < ctx.config.min_ocr_confidence:
+            yield Issue(
+                "low_ocr_confidence",
+                Severity.WARNING,
+                f"Page {number} was recognised with mean OCR confidence {score:.2f} "
+                f"(below {ctx.config.min_ocr_confidence:.2f}); compare values with the original.",
+            )
+
+
 DEFAULT_CHECKS: tuple[Check, ...] = (
     check_required_fields,
     check_line_items_sum,
@@ -231,6 +256,7 @@ DEFAULT_CHECKS: tuple[Check, ...] = (
     check_tax_id,
     check_duplicates,
     check_evidence,
+    check_ocr_quality,
 )
 
 

@@ -20,6 +20,7 @@ class RoutingConfig:
     confidence_threshold: float = 0.75
     review_on_warnings: bool = False
     review_new_vendors: bool = False
+    review_low_ocr_quality: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +55,9 @@ def route(
 
     if config.review_new_vendors and any(i.code == "new_vendor" for i in issues):
         reasons.append("first invoice from an unknown vendor")
+
+    if config.review_low_ocr_quality and any(i.code == "low_ocr_confidence" for i in issues):
+        reasons.append("poor scan: OCR confidence below the page threshold")
 
     lowest, scores = min_confidence(invoice)
     low = [f"{name}={score:.2f}" for name, score in scores if score < config.confidence_threshold]
