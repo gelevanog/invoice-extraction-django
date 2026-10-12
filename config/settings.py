@@ -127,6 +127,10 @@ DOCEXTRACT = {
     "OPENROUTER_FALLBACK_MODELS": env.list("OPENROUTER_FALLBACK_MODELS", default=[]),
     "OPENROUTER_SITE_URL": env("OPENROUTER_SITE_URL", default=""),
     "OPENROUTER_APP_NAME": env("OPENROUTER_APP_NAME", default="DocExtract"),
+    # Opt-in for non-":free" models and other OpenAI-compatible endpoints (default: free only).
+    "ALLOW_PAID_MODELS": env.bool("ALLOW_PAID_MODELS", default=False),
+    "OPENROUTER_BASE_URL": env("OPENROUTER_BASE_URL", default=""),
+    "LLM_JSON_SCHEMA_STRICT": env.bool("LLM_JSON_SCHEMA_STRICT", default=False),
     "LLM_MAX_ATTEMPTS": env.int("LLM_MAX_ATTEMPTS", default=3),
     "LLM_MAX_RETRIES": env.int("LLM_MAX_RETRIES", default=2),
     "LLM_MIN_INTERVAL_SECONDS": env.float("LLM_MIN_INTERVAL_SECONDS", default=0.0),

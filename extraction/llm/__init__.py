@@ -27,11 +27,16 @@ def build_provider(
     fallback_models: Sequence[str] = (),
     site_url: str = "",
     app_name: str = "",
+    base_url: str = "",
+    allow_paid_models: bool = False,
+    strict_schema: bool = False,
 ) -> LLMProvider:
     """Instantiate a provider by name. SDK imports are lazy so ``fake`` needs no keys.
 
     ``max_retries`` / ``min_interval`` apply to the real providers; ``fallback_models``,
-    ``site_url`` and ``app_name`` only to ``openrouter``.
+    ``site_url``, ``app_name``, ``base_url``, ``allow_paid_models`` and ``strict_schema``
+    only to ``openrouter``, which rejects non-``:free`` models unless
+    ``allow_paid_models`` is set.
     """
     name = name.lower()
     if name == "fake":
@@ -73,6 +78,9 @@ def build_provider(
             app_name=app_name,
             max_retries=max_retries,
             min_interval=min_interval,
+            base_url=base_url,
+            allow_paid_models=allow_paid_models,
+            strict_schema=strict_schema,
         )
     raise ValueError(f"Unknown LLM provider '{name}'. Choose one of: {', '.join(PROVIDER_NAMES)}")
 

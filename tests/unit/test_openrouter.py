@@ -64,7 +64,7 @@ def test_fallback_models_go_into_the_request_body() -> None:
 
 def test_without_fallbacks_no_extra_body() -> None:
     client, completions = _client(_completion("m"))
-    OpenRouterProvider("m", client=client).complete_json(REQUEST)
+    OpenRouterProvider("m:free", client=client).complete_json(REQUEST)
     assert "extra_body" not in completions.kwargs
 
 
@@ -72,7 +72,7 @@ def test_empty_choices_become_llm_error() -> None:
     body = SimpleNamespace(choices=[], model="m", usage=None, error={"code": 429})
     client, _ = _client(body)
     with pytest.raises(LLMError, match="No completion returned"):
-        OpenRouterProvider("m", client=client).complete_json(REQUEST)
+        OpenRouterProvider("m:free", client=client).complete_json(REQUEST)
 
 
 def test_client_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,6 +90,46 @@ def test_client_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY")
     with pytest.raises(ValueError, match="OPENROUTER_API_KEY"):
         build_provider("openrouter")
+
+
+def test_paid_models_are_rejected_by_default() -> None:
+    client, _ = _client(_completion("anthropic/claude-haiku-5-5"))
+    with pytest.raises(ValueError, match="ALLOW_PAID_MODELS"):
+        OpenRouterProvider("anthropic/claude-haiku-5-5", client=client)
+    with pytest.raises(ValueError, match=r"openai/gpt-5\.4-mini"):  # a paid fallback too
+        OpenRouterProvider("m:free", client=client, fallback_models=["openai/gpt-5.4-mini"])
+
+
+def test_paid_models_are_rejected_by_default_via_build_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    with pytest.raises(ValueError, match="not OpenRouter ':free' models"):
+        build_provider("openrouter", model="claude-haiku-5-5")
+
+
+def test_paid_models_and_custom_endpoint_with_explicit_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "gateway-key")
+    provider = build_provider(
+        "openrouter",
+        model="claude-haiku-5-5",
+        base_url="http://127.0.0.1:8787/v1",
+        allow_paid_models=True,
+    )
+    assert provider.model == "claude-haiku-5-5"
+    client = provider._client  # type: ignore[attr-defined]
+    assert str(client.base_url).rstrip("/") == "http://127.0.0.1:8787/v1"
+
+
+def test_schema_strictness_is_configurable() -> None:
+    client, completions = _client(_completion("m:free"))
+    OpenRouterProvider("m:free", client=client).complete_json(REQUEST)
+    assert completions.kwargs["response_format"]["json_schema"]["strict"] is False
+    OpenRouterProvider("m:free", client=client, strict_schema=True).complete_json(REQUEST)
+    assert completions.kwargs["response_format"]["json_schema"]["strict"] is True
+    assert "temperature" not in completions.kwargs  # never sent (some models reject it)
 
 
 def test_throttle_spaces_requests(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -137,3 +177,28 @@ def test_portable_schema_rejects_recursion() -> None:
 
     with pytest.raises(ValueError, match="Recursive schema 'Node'"):
         portable_json_schema(Node)
+
+
+def test_settings_default_to_free_only(settings: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    from documents.services import build_llm_provider
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    assert settings.DOCEXTRACT["ALLOW_PAID_MODELS"] is False
+    settings.DOCEXTRACT = {
+        **settings.DOCEXTRACT,
+        "LLM_PROVIDER": "openrouter",
+        "OPENROUTER_MODEL": "claude-haiku-5-5",
+        "OPENROUTER_FALLBACK_MODELS": [],
+    }
+    with pytest.raises(ValueError, match="ALLOW_PAID_MODELS"):
+        build_llm_provider()
+
+    settings.DOCEXTRACT = {
+        **settings.DOCEXTRACT,
+        "ALLOW_PAID_MODELS": True,
+        "OPENROUTER_BASE_URL": "http://127.0.0.1:8787/v1",
+        "LLM_JSON_SCHEMA_STRICT": True,
+    }
+    provider = build_llm_provider()
+    assert provider.model == "claude-haiku-5-5"
+    assert provider._strict_schema is True  # type: ignore[attr-defined]

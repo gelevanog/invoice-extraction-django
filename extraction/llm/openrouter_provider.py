@@ -4,6 +4,11 @@ Differences from plain OpenAI are configuration only: the base URL, the API key
 (``OPENROUTER_API_KEY``), optional attribution headers, and a ``models`` list in the
 request body - OpenRouter tries those in order when the primary model is rate-limited
 or down. The model that actually answered is reported back and stored with each run.
+
+Free-only by default: every model (primary and fallbacks) must be a ``:free`` model
+unless paid models are explicitly allowed (``ALLOW_PAID_MODELS=true``). With that
+opt-in, ``base_url`` can also point the provider at any other OpenAI-compatible
+endpoint (e.g. a self-hosted gateway).
 """
 
 from __future__ import annotations
@@ -17,6 +22,19 @@ from extraction.llm.openai_provider import OpenAIProvider
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_OPENROUTER_MODEL = "dots-studio/dots-3-note-preview:free"
+FREE_MODEL_SUFFIX = ":free"
+
+
+def check_free_models(models: Sequence[str], *, allow_paid_models: bool = False) -> None:
+    """Reject non-``:free`` models unless paid models were explicitly allowed."""
+    if allow_paid_models:
+        return
+    paid = [m for m in models if not m.endswith(FREE_MODEL_SUFFIX)]
+    if paid:
+        raise ValueError(
+            f"Model(s) {', '.join(paid)} are not OpenRouter ':free' models. "
+            "Set ALLOW_PAID_MODELS=true to use paid models."
+        )
 
 
 class OpenRouterProvider(OpenAIProvider):
@@ -34,7 +52,11 @@ class OpenRouterProvider(OpenAIProvider):
         app_name: str = "",
         max_retries: int = 2,
         min_interval: float = 0.0,
+        base_url: str = "",
+        allow_paid_models: bool = False,
+        strict_schema: bool = False,
     ) -> None:
+        check_free_models([model, *fallback_models], allow_paid_models=allow_paid_models)
         if client is None:
             key = api_key or os.environ.get("OPENROUTER_API_KEY")
             if not key:
@@ -42,7 +64,7 @@ class OpenRouterProvider(OpenAIProvider):
             headers = {"HTTP-Referer": site_url, "X-Title": app_name}
             client = openai.OpenAI(
                 api_key=key,
-                base_url=OPENROUTER_BASE_URL,
+                base_url=base_url or OPENROUTER_BASE_URL,
                 timeout=timeout,
                 max_retries=max_retries,
                 default_headers={k: v for k, v in headers.items() if v} or None,
@@ -53,4 +75,5 @@ class OpenRouterProvider(OpenAIProvider):
             client=client,
             min_interval=min_interval,
             extra_body={"models": [model, *fallbacks]} if fallbacks else None,
+            strict_schema=strict_schema,
         )

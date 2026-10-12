@@ -34,6 +34,7 @@ class OpenAIProvider:
         max_retries: int = 2,
         min_interval: float = 0.0,
         extra_body: dict[str, Any] | None = None,
+        strict_schema: bool = False,
     ) -> None:
         self.model = model
         # The SDK retries 429/5xx/connection errors with exponential backoff and honours
@@ -43,6 +44,9 @@ class OpenAIProvider:
         )
         self._throttle = Throttle(min_interval)
         self._extra_body = extra_body
+        # Some OpenAI-compatible endpoints (e.g. Claude behind an OpenAI-style gateway)
+        # only accept ``strict: true``. Optional fields stay optional there.
+        self._strict_schema = strict_schema
 
     def complete_json(self, request: JsonRequest) -> LLMResponse:
         messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": request.system}]
@@ -51,16 +55,17 @@ class OpenAIProvider:
                 messages.append({"role": "user", "content": _user_content(message)})
             else:
                 messages.append({"role": "assistant", "content": message.content})
-        # Non-strict: strict mode requires every property to be required, which does not
-        # fit optional fields. The portable schema (refs inlined, value constraints
-        # dropped) is accepted by OpenAI-compatible gateways too; Pydantic validation +
-        # the retry loop enforce the full schema.
+        # Non-strict by default: OpenAI's strict mode requires every property to be
+        # required, which does not fit optional fields (``strict_schema`` opts in). The
+        # portable schema (refs inlined, value constraints dropped) is accepted by
+        # OpenAI-compatible gateways too; Pydantic validation + the retry loop enforce
+        # the full schema.
         response_format: ResponseFormatJSONSchema = {
             "type": "json_schema",
             "json_schema": {
                 "name": request.schema.__name__,
                 "schema": portable_json_schema(request.schema),
-                "strict": False,
+                "strict": self._strict_schema,
             },
         }
         options: dict[str, Any] = {"extra_body": self._extra_body} if self._extra_body else {}
