@@ -1,0 +1,295 @@
+{
+  "_comment": "What is printed on the fictional sample documents (see scripts/make_samples.py). Used by manage.py eval_extraction. vendor_name is the name as printed (before vendor matching).",
+  "01_brightline_software_invoice.pdf": {
+    "vendor_name": "Brightline Software GmbH",
+    "vendor_tax_id": "DE811234567",
+    "invoice_number": "BLS-2026-0142",
+    "issue_date": "2026-03-02",
+    "due_date": "2026-04-01",
+    "currency": "EUR",
+    "subtotal": "1338.00",
+    "tax": "254.22",
+    "total": "1592.22",
+    "line_items": [
+      {
+        "description": "Team plan subscription (March)",
+        "quantity": "12",
+        "unit_price": "49.00",
+        "amount": "588.00"
+      },
+      {
+        "description": "Priority support add-on",
+        "quantity": "1",
+        "unit_price": "150.00",
+        "amount": "150.00"
+      },
+      {
+        "description": "Onboarding workshop (half day)",
+        "quantity": "1",
+        "unit_price": "600.00",
+        "amount": "600.00"
+      }
+    ]
+  },
+  "02_northwind_office_supplies.pdf": {
+    "vendor_name": "Northwind Traders Ltd.",
+    "vendor_tax_id": "GB123456789",
+    "invoice_number": "NWT-58311",
+    "issue_date": "2026-03-14",
+    "due_date": "2026-04-13",
+    "currency": "GBP",
+    "subtotal": "547.00",
+    "tax": "109.40",
+    "total": "656.40",
+    "line_items": [
+      {
+        "description": "A4 copy paper, 80gsm (box of 5 reams)",
+        "quantity": "10",
+        "unit_price": "21.50",
+        "amount": "215.00"
+      },
+      {
+        "description": "Toner cartridge TN-2420",
+        "quantity": "4",
+        "unit_price": "68.90",
+        "amount": "275.60"
+      },
+      {
+        "description": "Whiteboard markers (pack of 12)",
+        "quantity": "6",
+        "unit_price": "9.40",
+        "amount": "56.40"
+      }
+    ]
+  },
+  "03_bluepeak_consulting_invoice.pdf": {
+    "vendor_name": "Bluepeak Consulting LLC",
+    "vendor_tax_id": "84-2917365",
+    "invoice_number": "BPC-1007",
+    "issue_date": "2026-03-05",
+    "due_date": "2026-04-04",
+    "currency": "USD",
+    "subtotal": "4500.00",
+    "tax": "0.00",
+    "total": "4500.00",
+    "line_items": [
+      {
+        "description": "Strategy workshop (2 days on site)",
+        "quantity": "2",
+        "unit_price": "1800.00",
+        "amount": "3600.00"
+      },
+      {
+        "description": "Follow-up report and recommendations",
+        "quantity": "1",
+        "unit_price": "600.00",
+        "amount": "600.00"
+      }
+    ]
+  },
+  "04_kestrel_freight_email.eml": {
+    "vendor_name": "Kestrel Freight Logistics B.V.",
+    "vendor_tax_id": "NL853746291B01",
+    "invoice_number": "KFL-88412",
+    "issue_date": "2026-03-12",
+    "due_date": null,
+    "currency": "EUR",
+    "subtotal": "957.50",
+    "tax": "201.08",
+    "total": "1158.58",
+    "line_items": [
+      {
+        "description": "Pallet transport Rotterdam - Berlin",
+        "quantity": "4",
+        "unit_price": "210.00",
+        "amount": "840.00"
+      },
+      {
+        "description": "Customs documentation",
+        "quantity": "1",
+        "unit_price": "75.00",
+        "amount": "75.00"
+      },
+      {
+        "description": "Fuel surcharge",
+        "quantity": "1",
+        "unit_price": "42.50",
+        "amount": "42.50"
+      }
+    ]
+  },
+  "05_pinecrest_hardware_receipt.txt": {
+    "vendor_name": "PINECREST HARDWARE",
+    "vendor_tax_id": null,
+    "invoice_number": "PH-88213",
+    "issue_date": "2026-03-18",
+    "due_date": null,
+    "currency": "USD",
+    "subtotal": "427.98",
+    "tax": "0.00",
+    "total": "427.98",
+    "line_items": [
+      {
+        "description": "USB-C docking station",
+        "quantity": "2",
+        "unit_price": "129.99",
+        "amount": "259.98"
+      },
+      {
+        "description": "27in monitor arm",
+        "quantity": "2",
+        "unit_price": "64.50",
+        "amount": "129.00"
+      },
+      {
+        "description": "HDMI cable 2m",
+        "quantity": "4",
+        "unit_price": "9.75",
+        "amount": "39.00"
+      }
+    ]
+  },
+  "06_brightline_software_invoice_copy.pdf": {
+    "vendor_name": "Brightline Software GmbH",
+    "vendor_tax_id": "DE811234567",
+    "invoice_number": "BLS-2026-0142",
+    "issue_date": "2026-03-02",
+    "due_date": "2026-04-01",
+    "currency": "EUR",
+    "subtotal": "1338.00",
+    "tax": "254.22",
+    "total": "1592.22",
+    "line_items": [
+      {
+        "description": "Team plan subscription (March)",
+        "quantity": "12",
+        "unit_price": "49.00",
+        "amount": "588.00"
+      },
+      {
+        "description": "Priority support add-on",
+        "quantity": "1",
+        "unit_price": "150.00",
+        "amount": "150.00"
+      },
+      {
+        "description": "Onboarding workshop (half day)",
+        "quantity": "1",
+        "unit_price": "600.00",
+        "amount": "600.00"
+      }
+    ]
+  },
+  "07_lantern_print_scan.pdf": {
+    "vendor_name": "Lantern Print Studio GmbH",
+    "vendor_tax_id": "DE274839165",
+    "invoice_number": "LPS-24-0918",
+    "issue_date": "2026-03-09",
+    "due_date": "2026-04-08",
+    "currency": "EUR",
+    "subtotal": "537.00",
+    "tax": "102.03",
+    "total": "639.03",
+    "line_items": [
+      {
+        "description": "Business cards, 400gsm (500 pcs)",
+        "quantity": "3",
+        "unit_price": "45.00",
+        "amount": "135.00"
+      },
+      {
+        "description": "Roll-up banner 85 x 200 cm",
+        "quantity": "2",
+        "unit_price": "119.00",
+        "amount": "238.00"
+      },
+      {
+        "description": "Flyers A5, 135gsm (2000 pcs)",
+        "quantity": "1",
+        "unit_price": "164.00",
+        "amount": "164.00"
+      }
+    ]
+  },
+  "08_copperleaf_catering_photo.jpg": {
+    "vendor_name": "COPPERLEAF CATERING LTD",
+    "vendor_tax_id": "GB284193762",
+    "invoice_number": "CC-20931",
+    "issue_date": "2026-03-20",
+    "due_date": null,
+    "currency": "GBP",
+    "subtotal": "168.50",
+    "tax": "33.70",
+    "total": "202.20",
+    "line_items": [
+      {
+        "description": "Lunch platter 10p",
+        "quantity": "2",
+        "unit_price": "48.00",
+        "amount": "96.00"
+      },
+      {
+        "description": "Fruit bowl",
+        "quantity": "3",
+        "unit_price": "12.50",
+        "amount": "37.50"
+      },
+      {
+        "description": "Coffee service",
+        "quantity": "1",
+        "unit_price": "35.00",
+        "amount": "35.00"
+      }
+    ]
+  },
+  "haverford_invoice_march.pdf": {
+    "vendor_name": "Haverford Office Interiors Ltd",
+    "vendor_tax_id": "GB318447625",
+    "invoice_number": "HOI-7731",
+    "issue_date": "2026-03-06",
+    "due_date": "2026-04-05",
+    "currency": "GBP",
+    "subtotal": "1420.00",
+    "tax": "284.00",
+    "total": "1704.00",
+    "line_items": [
+      {
+        "description": "Height-adjustable desk frame",
+        "quantity": "4",
+        "unit_price": "310.00",
+        "amount": "1240.00"
+      },
+      {
+        "description": "Desk installation (per desk)",
+        "quantity": "4",
+        "unit_price": "45.00",
+        "amount": "180.00"
+      }
+    ]
+  },
+  "haverford_invoice_april.pdf": {
+    "vendor_name": "Haverford Office Interiors Ltd",
+    "vendor_tax_id": "GB318447625",
+    "invoice_number": "HOI-7802",
+    "issue_date": "2026-04-03",
+    "due_date": "2026-05-03",
+    "currency": "GBP",
+    "subtotal": "681.00",
+    "tax": "136.20",
+    "total": "817.20",
+    "line_items": [
+      {
+        "description": "Acoustic desk screen 140 cm",
+        "quantity": "6",
+        "unit_price": "89.00",
+        "amount": "534.00"
+      },
+      {
+        "description": "Cable tray, steel",
+        "quantity": "6",
+        "unit_price": "24.50",
+        "amount": "147.00"
+      }
+    ]
+  }
+}
