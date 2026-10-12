@@ -89,7 +89,8 @@ two OCR calls.
   - Opus was correct 2/2.
   - Qwen returned a malformed response shape 2/3 times.
   A small hardening would remove the Qwen failure: retry-with-feedback in `extraction/ocr/vision.py`, or
-  accepting a single-element list.
+  accepting a single-element list. *Update:* both are now implemented (list-wrapped transcriptions are
+  unwrapped, other invalid responses get one retry with feedback), covered by unit tests; Qwen was not re-run.
 - **Request-shape compatibility was the main integration cost.** The Claude-behind-OpenAI gateway rejects
   `strict: false` and cannot compile the invoice schema in strict mode. The new `LLM_RESPONSE_FORMAT=none`
   mode handles it by keeping the schema in the prompt; Pydantic validation and the retry loop are unchanged,
