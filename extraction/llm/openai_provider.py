@@ -5,7 +5,8 @@ Also the base for OpenAI-compatible APIs (see :mod:`extraction.llm.openrouter_pr
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from typing import Any, Literal
 
 import openai
 from openai.types.chat import (
@@ -19,6 +20,14 @@ from extraction.llm.base import ChatMessage, JsonRequest, LLMError, LLMResponse,
 from extraction.llm.schema import portable_json_schema
 
 DEFAULT_OPENAI_MODEL = "gpt-5.4-mini"
+
+# How the JSON schema is sent: ``json_schema`` (non-strict, the default), ``strict``
+# (``strict: true``, for endpoints that only accept that) or ``none`` (no
+# ``response_format``; the schema is still in the prompt and Pydantic validates the
+# answer - for endpoints whose structured-output mode cannot compile the schema).
+ResponseFormatMode = Literal["json_schema", "strict", "none"]
+RESPONSE_FORMAT_MODES: tuple[ResponseFormatMode, ...] = ("json_schema", "strict", "none")
+SCHEMA_IN_PROMPT = "Respond with a single JSON object (no prose) that matches this JSON schema:"
 
 
 class OpenAIProvider:
@@ -34,7 +43,13 @@ class OpenAIProvider:
         max_retries: int = 2,
         min_interval: float = 0.0,
         extra_body: dict[str, Any] | None = None,
+        response_format: ResponseFormatMode = "json_schema",
     ) -> None:
+        if response_format not in RESPONSE_FORMAT_MODES:
+            raise ValueError(
+                f"Unknown response format '{response_format}'. "
+                f"Choose one of: {', '.join(RESPONSE_FORMAT_MODES)}"
+            )
         self.model = model
         # The SDK retries 429/5xx/connection errors with exponential backoff and honours
         # Retry-After; ``max_retries`` sets how many times.
@@ -43,34 +58,41 @@ class OpenAIProvider:
         )
         self._throttle = Throttle(min_interval)
         self._extra_body = extra_body
+        self._response_format = response_format
 
     def complete_json(self, request: JsonRequest) -> LLMResponse:
-        messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": request.system}]
+        system = request.system
+        if self._response_format == "none":
+            # Without response_format only the prompt carries the schema.
+            schema = json.dumps(portable_json_schema(request.schema), separators=(",", ":"))
+            system = f"{system}\n\n{SCHEMA_IN_PROMPT}\n{schema}"
+        messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": system}]
         for message in request.messages:
             if message.role == "user":
                 messages.append({"role": "user", "content": _user_content(message)})
             else:
                 messages.append({"role": "assistant", "content": message.content})
-        # Non-strict: strict mode requires every property to be required, which does not
-        # fit optional fields. The portable schema (refs inlined, value constraints
-        # dropped) is accepted by OpenAI-compatible gateways too; Pydantic validation +
-        # the retry loop enforce the full schema.
-        response_format: ResponseFormatJSONSchema = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": request.schema.__name__,
-                "schema": portable_json_schema(request.schema),
-                "strict": False,
-            },
-        }
+        # Non-strict by default: OpenAI's strict mode requires every property to be
+        # required, which does not fit optional fields. The portable schema (refs
+        # inlined, value constraints dropped) is accepted by OpenAI-compatible gateways
+        # too; Pydantic validation + the retry loop enforce the full schema.
         options: dict[str, Any] = {"extra_body": self._extra_body} if self._extra_body else {}
+        if self._response_format != "none":
+            response_format: ResponseFormatJSONSchema = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": request.schema.__name__,
+                    "schema": portable_json_schema(request.schema),
+                    "strict": self._response_format == "strict",
+                },
+            }
+            options["response_format"] = response_format
         self._throttle.wait()
         try:
             response = self._client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_completion_tokens=request.max_tokens,
-                response_format=response_format,
                 **options,
             )
         except openai.APIConnectionError as exc:

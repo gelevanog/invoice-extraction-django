@@ -69,6 +69,9 @@ def build_llm_provider() -> LLMProvider:
         fallback_models=cfg["OPENROUTER_FALLBACK_MODELS"],
         site_url=cfg["OPENROUTER_SITE_URL"],
         app_name=cfg["OPENROUTER_APP_NAME"],
+        base_url=cfg["OPENROUTER_BASE_URL"],
+        allow_paid_models=cfg["ALLOW_PAID_MODELS"],
+        response_format=cfg["LLM_RESPONSE_FORMAT"],
     )
 
 

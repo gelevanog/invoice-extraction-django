@@ -1,0 +1,1501 @@
+{
+  "label": "qwen-run2",
+  "provider": "openrouter",
+  "model": "qwen3.7-plus",
+  "response_format": "json_schema",
+  "ocr_engine": "vision",
+  "created_at": "2026-10-12T09:46:01+00:00",
+  "seconds": 194.03,
+  "summary": {
+    "documents": 10,
+    "header_correct": 81,
+    "header_total": 90,
+    "header_accuracy": 0.9,
+    "docs_all_header_correct": 9,
+    "line_fields_correct": 96,
+    "line_fields_total": 108,
+    "line_accuracy": 0.8889,
+    "line_count_ok": 9,
+    "schema_valid": 9,
+    "valid_first_attempt": 9,
+    "attempts": 9,
+    "input_tokens": 43254,
+    "output_tokens": 8342,
+    "llm_latency_ms": 165512,
+    "evidence_not_found": 0,
+    "transient_retries": 0,
+    "per_field": {
+      "vendor_name": 9,
+      "vendor_tax_id": 9,
+      "invoice_number": 9,
+      "issue_date": 9,
+      "due_date": 9,
+      "currency": 9,
+      "subtotal": 9,
+      "tax": 9,
+      "total": 9
+    },
+    "statuses": {
+      "approved": 7,
+      "needs_review": 2,
+      "failed": 1
+    }
+  },
+  "documents": [
+    {
+      "file": "01_brightline_software_invoice.pdf",
+      "status": "approved",
+      "error": "",
+      "issues": [],
+      "routing_reasons": [],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4865,
+      "output_tokens": 976,
+      "llm_latency_ms": 19109,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "Brightline Software GmbH",
+          "got": "Brightline Software GmbH",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "DE811234567",
+          "got": "DE811234567",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "BLS-2026-0142",
+          "got": "BLS-2026-0142",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-02",
+          "got": "2026-03-02",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": "2026-04-01",
+          "got": "2026-04-01",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "EUR",
+          "got": "EUR",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "1338.00",
+          "got": "1338",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "254.22",
+          "got": "254.22",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "1592.22",
+          "got": "1592.22",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 3,
+        "extracted": 3,
+        "fields": [
+          {
+            "description": {
+              "expected": "Team plan subscription (March)",
+              "got": "Team plan subscription (March)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "12",
+              "got": "12",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "49.00",
+              "got": "49",
+              "correct": true
+            },
+            "amount": {
+              "expected": "588.00",
+              "got": "588",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Priority support add-on",
+              "got": "Priority support add-on",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "150.00",
+              "got": "150",
+              "correct": true
+            },
+            "amount": {
+              "expected": "150.00",
+              "got": "150",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Onboarding workshop (half day)",
+              "got": "Onboarding workshop (half day)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "600.00",
+              "got": "600",
+              "correct": true
+            },
+            "amount": {
+              "expected": "600.00",
+              "got": "600",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 12,
+      "line_fields_total": 12,
+      "line_count_ok": true,
+      "seconds": 19.14,
+      "transient_retries": 0
+    },
+    {
+      "file": "02_northwind_office_supplies.pdf",
+      "status": "approved",
+      "error": "",
+      "issues": [],
+      "routing_reasons": [],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4823,
+      "output_tokens": 989,
+      "llm_latency_ms": 19554,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "Northwind Traders Ltd.",
+          "got": "Northwind Traders Ltd.",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "GB123456789",
+          "got": "GB123456789",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "NWT-58311",
+          "got": "NWT-58311",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-14",
+          "got": "2026-03-14",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": "2026-04-13",
+          "got": "2026-04-13",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "GBP",
+          "got": "GBP",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "547.00",
+          "got": "547",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "109.40",
+          "got": "109.4",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "656.40",
+          "got": "656.4",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 3,
+        "extracted": 3,
+        "fields": [
+          {
+            "description": {
+              "expected": "A4 copy paper, 80gsm (box of 5 reams)",
+              "got": "A4 copy paper, 80gsm (box of 5 reams)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "10",
+              "got": "10",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "21.50",
+              "got": "21.5",
+              "correct": true
+            },
+            "amount": {
+              "expected": "215.00",
+              "got": "215",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Toner cartridge TN-2420",
+              "got": "Toner cartridge TN-2420",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "4",
+              "got": "4",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "68.90",
+              "got": "68.9",
+              "correct": true
+            },
+            "amount": {
+              "expected": "275.60",
+              "got": "275.6",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Whiteboard markers (pack of 12)",
+              "got": "Whiteboard markers (pack of 12)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "6",
+              "got": "6",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "9.40",
+              "got": "9.4",
+              "correct": true
+            },
+            "amount": {
+              "expected": "56.40",
+              "got": "56.4",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 12,
+      "line_fields_total": 12,
+      "line_count_ok": true,
+      "seconds": 19.58,
+      "transient_retries": 0
+    },
+    {
+      "file": "03_bluepeak_consulting_invoice.pdf",
+      "status": "needs_review",
+      "error": "",
+      "issues": [
+        "invalid_tax_id_format",
+        "line_items_sum_mismatch",
+        "new_vendor"
+      ],
+      "routing_reasons": [
+        "1 error-level issue(s): line_items_sum_mismatch"
+      ],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4776,
+      "output_tokens": 853,
+      "llm_latency_ms": 16969,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "Bluepeak Consulting LLC",
+          "got": "Bluepeak Consulting LLC",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "84-2917365",
+          "got": "842917365",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "BPC-1007",
+          "got": "BPC-1007",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-05",
+          "got": "2026-03-05",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": "2026-04-04",
+          "got": "2026-04-04",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "USD",
+          "got": "USD",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "4500.00",
+          "got": "4500",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "0.00",
+          "got": "0",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "4500.00",
+          "got": "4500",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 2,
+        "extracted": 2,
+        "fields": [
+          {
+            "description": {
+              "expected": "Strategy workshop (2 days on site)",
+              "got": "Strategy workshop (2 days on site)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "2",
+              "got": "2",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "1800.00",
+              "got": "1800",
+              "correct": true
+            },
+            "amount": {
+              "expected": "3600.00",
+              "got": "3600",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Follow-up report and recommendations",
+              "got": "Follow-up report and recommendations",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "600.00",
+              "got": "600",
+              "correct": true
+            },
+            "amount": {
+              "expected": "600.00",
+              "got": "600",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 8,
+      "line_fields_total": 8,
+      "line_count_ok": true,
+      "seconds": 16.98,
+      "transient_retries": 0
+    },
+    {
+      "file": "04_kestrel_freight_email.eml",
+      "status": "approved",
+      "error": "",
+      "issues": [
+        "missing_due_date"
+      ],
+      "routing_reasons": [],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4841,
+      "output_tokens": 927,
+      "llm_latency_ms": 18267,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "Kestrel Freight Logistics B.V.",
+          "got": "Kestrel Freight Logistics B.V.",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "NL853746291B01",
+          "got": "NL853746291B01",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "KFL-88412",
+          "got": "KFL-88412",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-12",
+          "got": "2026-03-12",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": null,
+          "got": null,
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "EUR",
+          "got": "EUR",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "957.50",
+          "got": "957.5",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "201.08",
+          "got": "201.08",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "1158.58",
+          "got": "1158.58",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 3,
+        "extracted": 3,
+        "fields": [
+          {
+            "description": {
+              "expected": "Pallet transport Rotterdam - Berlin",
+              "got": "Pallet transport Rotterdam - Berlin",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "4",
+              "got": "4",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "210.00",
+              "got": "210",
+              "correct": true
+            },
+            "amount": {
+              "expected": "840.00",
+              "got": "840",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Customs documentation",
+              "got": "Customs documentation",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "75.00",
+              "got": "75",
+              "correct": true
+            },
+            "amount": {
+              "expected": "75.00",
+              "got": "75",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Fuel surcharge",
+              "got": "Fuel surcharge",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "42.50",
+              "got": "42.5",
+              "correct": true
+            },
+            "amount": {
+              "expected": "42.50",
+              "got": "42.5",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 12,
+      "line_fields_total": 12,
+      "line_count_ok": true,
+      "seconds": 18.28,
+      "transient_retries": 0
+    },
+    {
+      "file": "05_pinecrest_hardware_receipt.txt",
+      "status": "approved",
+      "error": "",
+      "issues": [
+        "missing_due_date",
+        "missing_tax_id",
+        "new_vendor"
+      ],
+      "routing_reasons": [],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4741,
+      "output_tokens": 861,
+      "llm_latency_ms": 17183,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "PINECREST HARDWARE",
+          "got": "PINECREST HARDWARE",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": null,
+          "got": null,
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "PH-88213",
+          "got": "PH-88213",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-18",
+          "got": "2026-03-18",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": null,
+          "got": null,
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "USD",
+          "got": "USD",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "427.98",
+          "got": "427.98",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "0.00",
+          "got": "0",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "427.98",
+          "got": "427.98",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 3,
+        "extracted": 3,
+        "fields": [
+          {
+            "description": {
+              "expected": "USB-C docking station",
+              "got": "USB-C docking station",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "2",
+              "got": "2",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "129.99",
+              "got": "129.99",
+              "correct": true
+            },
+            "amount": {
+              "expected": "259.98",
+              "got": "259.98",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "27in monitor arm",
+              "got": "27in monitor arm",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "2",
+              "got": "2",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "64.50",
+              "got": "64.5",
+              "correct": true
+            },
+            "amount": {
+              "expected": "129.00",
+              "got": "129",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "HDMI cable 2m",
+              "got": "HDMI cable 2m",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "4",
+              "got": "4",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "9.75",
+              "got": "9.75",
+              "correct": true
+            },
+            "amount": {
+              "expected": "39.00",
+              "got": "39",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 12,
+      "line_fields_total": 12,
+      "line_count_ok": true,
+      "seconds": 17.2,
+      "transient_retries": 0
+    },
+    {
+      "file": "06_brightline_software_invoice_copy.pdf",
+      "status": "needs_review",
+      "error": "",
+      "issues": [
+        "duplicate_invoice"
+      ],
+      "routing_reasons": [
+        "1 error-level issue(s): duplicate_invoice"
+      ],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4834,
+      "output_tokens": 973,
+      "llm_latency_ms": 19600,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "Brightline Software GmbH",
+          "got": "Brightline Software GmbH",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "DE811234567",
+          "got": "DE811234567",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "BLS-2026-0142",
+          "got": "BLS-2026-0142",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-02",
+          "got": "2026-03-02",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": "2026-04-01",
+          "got": "2026-04-01",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "EUR",
+          "got": "EUR",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "1338.00",
+          "got": "1338",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "254.22",
+          "got": "254.22",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "1592.22",
+          "got": "1592.22",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 3,
+        "extracted": 3,
+        "fields": [
+          {
+            "description": {
+              "expected": "Team plan subscription (March)",
+              "got": "Team plan subscription (March)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "12",
+              "got": "12",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "49.00",
+              "got": "49",
+              "correct": true
+            },
+            "amount": {
+              "expected": "588.00",
+              "got": "588",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Priority support add-on",
+              "got": "Priority support add-on",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "150.00",
+              "got": "150",
+              "correct": true
+            },
+            "amount": {
+              "expected": "150.00",
+              "got": "150",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Onboarding workshop (half day)",
+              "got": "Onboarding workshop (half day)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "600.00",
+              "got": "600",
+              "correct": true
+            },
+            "amount": {
+              "expected": "600.00",
+              "got": "600",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 12,
+      "line_fields_total": 12,
+      "line_count_ok": true,
+      "seconds": 19.62,
+      "transient_retries": 0
+    },
+    {
+      "file": "07_lantern_print_scan.pdf",
+      "status": "approved",
+      "error": "",
+      "issues": [
+        "new_vendor",
+        "ocr_text"
+      ],
+      "routing_reasons": [],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4828,
+      "output_tokens": 1028,
+      "llm_latency_ms": 20165,
+      "model_served": "qwen3.7-plus",
+      "ocr": "vision:openrouter/qwen3.7-plus",
+      "fields": {
+        "vendor_name": {
+          "expected": "Lantern Print Studio GmbH",
+          "got": "Lantern Print Studio GmbH",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "DE274839165",
+          "got": "DE274839165",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "LPS-24-0918",
+          "got": "LPS-24-0918",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-09",
+          "got": "2026-03-09",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": "2026-04-08",
+          "got": "2026-04-08",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "EUR",
+          "got": "EUR",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "537.00",
+          "got": "537",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "102.03",
+          "got": "102.03",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "639.03",
+          "got": "639.03",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 3,
+        "extracted": 3,
+        "fields": [
+          {
+            "description": {
+              "expected": "Business cards, 400gsm (500 pcs)",
+              "got": "Business cards, 400gsm (500 pcs)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "3",
+              "got": "3",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "45.00",
+              "got": "45",
+              "correct": true
+            },
+            "amount": {
+              "expected": "135.00",
+              "got": "135",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Roll-up banner 85 x 200 cm",
+              "got": "Roll-up banner 85 x 200 cm",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "2",
+              "got": "2",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "119.00",
+              "got": "119",
+              "correct": true
+            },
+            "amount": {
+              "expected": "238.00",
+              "got": "238",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Flyers A5, 135gsm (2000 pcs)",
+              "got": "Flyers A5, 135gsm (2000 pcs)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "1",
+              "got": "1",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "164.00",
+              "got": "164",
+              "correct": true
+            },
+            "amount": {
+              "expected": "164.00",
+              "got": "164",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 12,
+      "line_fields_total": 12,
+      "line_count_ok": true,
+      "seconds": 38.02,
+      "transient_retries": 0
+    },
+    {
+      "file": "08_copperleaf_catering_photo.jpg",
+      "status": "failed",
+      "error": "OCR failed: Vision OCR returned an invalid transcription: 1 validation error for PageTranscription\n  Input should be an object [type=model_type, input_value=[{'lines': [{'text': 'COP...', 'confidence': 1.0}]}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.13/v/model_type",
+      "issues": [],
+      "routing_reasons": [],
+      "schema_valid": false,
+      "attempts": 0,
+      "valid_first_attempt": false,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "llm_latency_ms": 0,
+      "model_served": "",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "COPPERLEAF CATERING LTD",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "vendor_tax_id": {
+          "expected": "GB284193762",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "invoice_number": {
+          "expected": "CC-20931",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "issue_date": {
+          "expected": "2026-03-20",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "due_date": {
+          "expected": null,
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "currency": {
+          "expected": "GBP",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "subtotal": {
+          "expected": "168.50",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "tax": {
+          "expected": "33.70",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        },
+        "total": {
+          "expected": "202.20",
+          "got": null,
+          "confidence": null,
+          "correct": false
+        }
+      },
+      "line_items": {
+        "expected": 3,
+        "extracted": 0,
+        "fields": [
+          {
+            "description": {
+              "expected": "Lunch platter 10p",
+              "got": null,
+              "correct": false
+            },
+            "quantity": {
+              "expected": "2",
+              "got": null,
+              "correct": false
+            },
+            "unit_price": {
+              "expected": "48.00",
+              "got": null,
+              "correct": false
+            },
+            "amount": {
+              "expected": "96.00",
+              "got": null,
+              "correct": false
+            }
+          },
+          {
+            "description": {
+              "expected": "Fruit bowl",
+              "got": null,
+              "correct": false
+            },
+            "quantity": {
+              "expected": "3",
+              "got": null,
+              "correct": false
+            },
+            "unit_price": {
+              "expected": "12.50",
+              "got": null,
+              "correct": false
+            },
+            "amount": {
+              "expected": "37.50",
+              "got": null,
+              "correct": false
+            }
+          },
+          {
+            "description": {
+              "expected": "Coffee service",
+              "got": null,
+              "correct": false
+            },
+            "quantity": {
+              "expected": "1",
+              "got": null,
+              "correct": false
+            },
+            "unit_price": {
+              "expected": "35.00",
+              "got": null,
+              "correct": false
+            },
+            "amount": {
+              "expected": "35.00",
+              "got": null,
+              "correct": false
+            }
+          }
+        ]
+      },
+      "header_correct": 0,
+      "header_total": 9,
+      "line_fields_correct": 0,
+      "line_fields_total": 12,
+      "line_count_ok": false,
+      "seconds": 10.51,
+      "transient_retries": 0
+    },
+    {
+      "file": "haverford_invoice_april.pdf",
+      "status": "approved",
+      "error": "",
+      "issues": [
+        "new_vendor"
+      ],
+      "routing_reasons": [],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4771,
+      "output_tokens": 868,
+      "llm_latency_ms": 17436,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "Haverford Office Interiors Ltd",
+          "got": "Haverford Office Interiors Ltd",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "GB318447625",
+          "got": "GB318447625",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "HOI-7802",
+          "got": "HOI-7802",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-04-03",
+          "got": "2026-04-03",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": "2026-05-03",
+          "got": "2026-05-03",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "GBP",
+          "got": "GBP",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "681.00",
+          "got": "681",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "136.20",
+          "got": "136.2",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "817.20",
+          "got": "817.2",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 2,
+        "extracted": 2,
+        "fields": [
+          {
+            "description": {
+              "expected": "Acoustic desk screen 140 cm",
+              "got": "Acoustic desk screen 140 cm",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "6",
+              "got": "6",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "89.00",
+              "got": "89",
+              "correct": true
+            },
+            "amount": {
+              "expected": "534.00",
+              "got": "534",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Cable tray, steel",
+              "got": "Cable tray, steel",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "6",
+              "got": "6",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "24.50",
+              "got": "24.5",
+              "correct": true
+            },
+            "amount": {
+              "expected": "147.00",
+              "got": "147",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 8,
+      "line_fields_total": 8,
+      "line_count_ok": true,
+      "seconds": 17.45,
+      "transient_retries": 0
+    },
+    {
+      "file": "haverford_invoice_march.pdf",
+      "status": "approved",
+      "error": "",
+      "issues": [],
+      "routing_reasons": [],
+      "schema_valid": true,
+      "attempts": 1,
+      "valid_first_attempt": true,
+      "input_tokens": 4775,
+      "output_tokens": 867,
+      "llm_latency_ms": 17229,
+      "model_served": "qwen3.7-plus",
+      "ocr": "",
+      "fields": {
+        "vendor_name": {
+          "expected": "Haverford Office Interiors Ltd",
+          "got": "Haverford Office Interiors Ltd",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "vendor_tax_id": {
+          "expected": "GB318447625",
+          "got": "GB318447625",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "invoice_number": {
+          "expected": "HOI-7731",
+          "got": "HOI-7731",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "issue_date": {
+          "expected": "2026-03-06",
+          "got": "2026-03-06",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "due_date": {
+          "expected": "2026-04-05",
+          "got": "2026-04-05",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "currency": {
+          "expected": "GBP",
+          "got": "GBP",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "subtotal": {
+          "expected": "1420.00",
+          "got": "1420",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "tax": {
+          "expected": "284.00",
+          "got": "284",
+          "confidence": 1.0,
+          "correct": true
+        },
+        "total": {
+          "expected": "1704.00",
+          "got": "1704",
+          "confidence": 1.0,
+          "correct": true
+        }
+      },
+      "line_items": {
+        "expected": 2,
+        "extracted": 2,
+        "fields": [
+          {
+            "description": {
+              "expected": "Height-adjustable desk frame",
+              "got": "Height-adjustable desk frame",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "4",
+              "got": "4",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "310.00",
+              "got": "310",
+              "correct": true
+            },
+            "amount": {
+              "expected": "1240.00",
+              "got": "1240",
+              "correct": true
+            }
+          },
+          {
+            "description": {
+              "expected": "Desk installation (per desk)",
+              "got": "Desk installation (per desk)",
+              "correct": true
+            },
+            "quantity": {
+              "expected": "4",
+              "got": "4",
+              "correct": true
+            },
+            "unit_price": {
+              "expected": "45.00",
+              "got": "45",
+              "correct": true
+            },
+            "amount": {
+              "expected": "180.00",
+              "got": "180",
+              "correct": true
+            }
+          }
+        ]
+      },
+      "header_correct": 9,
+      "header_total": 9,
+      "line_fields_correct": 8,
+      "line_fields_total": 8,
+      "line_count_ok": true,
+      "seconds": 17.24,
+      "transient_retries": 0
+    }
+  ]
+}

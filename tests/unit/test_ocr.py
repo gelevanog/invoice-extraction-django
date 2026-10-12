@@ -12,6 +12,7 @@ from typing import Any
 import pytesseract
 import pytest
 from PIL import Image
+from pydantic import ValidationError
 from reportlab.pdfgen import canvas
 
 from extraction.evidence import cap_confidence_to_ocr, locate, resolve_invoice_evidence
@@ -22,7 +23,12 @@ from extraction.llm.openai_provider import OpenAIProvider
 from extraction.ocr import OcrError, OcrPage, build_ocr_engine
 from extraction.ocr.layout import COLUMN_GAP, PageBuilder, RecognizedWord
 from extraction.ocr.tesseract import TesseractOcrEngine, page_from_tesseract_data
-from extraction.ocr.vision import VISION_SYSTEM_PROMPT, PageTranscription, VisionOcrEngine
+from extraction.ocr.vision import (
+    VISION_SYSTEM_PROMPT,
+    PageTranscription,
+    VisionOcrEngine,
+    parse_transcription,
+)
 from extraction.parse import ParseError, UnsupportedDocumentError, parse_document
 from extraction.route import Route, RoutingConfig, route
 from extraction.schemas import Evidence
@@ -158,15 +164,17 @@ class RecordingProvider:
     name = "anthropic"
     model = "claude-sonnet-5"
 
-    def __init__(self, response: str | Exception) -> None:
-        self.response = response
+    def __init__(self, *responses: str | Exception) -> None:
+        """Returns ``responses`` in order; the last one repeats."""
+        self.responses = responses
         self.requests: list[JsonRequest] = []
 
     def complete_json(self, request: JsonRequest) -> LLMResponse:
         self.requests.append(request)
-        if isinstance(self.response, Exception):
-            raise self.response
-        return LLMResponse(self.response, self.model, 1500, 200)
+        response = self.responses[min(len(self.requests), len(self.responses)) - 1]
+        if isinstance(response, Exception):
+            raise response
+        return LLMResponse(response, self.model, 1500, 200)
 
 
 def test_vision_engine_sends_downscaled_image_and_builds_page() -> None:
@@ -188,11 +196,92 @@ def test_vision_engine_sends_downscaled_image_and_builds_page() -> None:
     assert Image.open(io.BytesIO(image.data)).size == (100, 50)
 
 
-@pytest.mark.parametrize("response", [LLMError("rate limited"), '{"lines": "nope"}'])
-def test_vision_engine_errors_become_ocr_errors(response: str | Exception) -> None:
-    engine = VisionOcrEngine(RecordingProvider(response))
+@pytest.mark.parametrize(
+    ("response", "calls"), [(LLMError("rate limited"), 1), ('{"lines": "nope"}', 2)]
+)
+def test_vision_engine_errors_become_ocr_errors(response: str | Exception, calls: int) -> None:
+    provider = RecordingProvider(response)
+    engine = VisionOcrEngine(provider)
     with pytest.raises(OcrError, match="Vision OCR"):
         engine.recognize(Image.new("L", (10, 10)))
+    assert len(provider.requests) == calls  # transport errors are not re-asked
+
+
+LINE_A = {"text": "COPPERLEAF CATERING LTD", "confidence": 0.98}
+LINE_B = {"text": "Total    202.20", "confidence": 0.9}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        json.dumps({"lines": [LINE_A, LINE_B]}),
+        # seen from qwen3.7-plus: the object wrapped in a top-level list
+        json.dumps([{"lines": [LINE_A, LINE_B]}]),
+        # several objects: lines are joined in order
+        json.dumps([{"lines": [LINE_A]}, {"lines": [LINE_B]}]),
+        # a bare list of line objects
+        json.dumps([LINE_A, LINE_B]),
+        # code fences / prose around the JSON
+        "```json\n" + json.dumps([{"lines": [LINE_A, LINE_B]}]) + "\n```",
+        "Here is the transcription:\n" + json.dumps({"lines": [LINE_A, LINE_B]}),
+    ],
+)
+def test_parse_transcription_normalises_wrapped_shapes(raw: str) -> None:
+    transcription = parse_transcription(raw)
+    assert [line.text for line in transcription.lines] == [LINE_A["text"], LINE_B["text"]]
+    assert [line.confidence for line in transcription.lines] == [0.98, 0.9]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "not json",
+        '{"lines": "nope"}',
+        "[]",
+        json.dumps([{"lines": [LINE_A]}, {"pages": []}]),  # mixed shapes: not guessed
+        json.dumps(["COPPERLEAF CATERING LTD"]),  # no confidence: not invented
+        json.dumps({"lines": [LINE_A], "extra": 1}),
+    ],
+)
+def test_parse_transcription_rejects_other_shapes(raw: str) -> None:
+    with pytest.raises(ValidationError):
+        parse_transcription(raw)
+
+
+def test_vision_engine_accepts_list_wrapped_transcription_without_retry() -> None:
+    provider = RecordingProvider(json.dumps([{"lines": [LINE_A, LINE_B]}]))
+
+    page = VisionOcrEngine(provider).recognize(Image.new("L", (10, 10)))
+
+    assert page.text == "COPPERLEAF CATERING LTD\nTotal    202.20"
+    assert len(provider.requests) == 1
+
+
+def test_vision_engine_retries_once_with_validation_feedback() -> None:
+    bad = json.dumps({"lines": [{"text": "COPPERLEAF", "confidence": 1.7}]})
+    provider = RecordingProvider(bad, json.dumps({"lines": [LINE_A]}))
+
+    page = VisionOcrEngine(provider).recognize(Image.new("L", (10, 10)))
+
+    assert page.text == "COPPERLEAF CATERING LTD"
+    assert len(provider.requests) == 2
+    first, retry = provider.requests
+    assert len(first.messages) == 1
+    assert [m.role for m in retry.messages] == ["user", "assistant", "user"]
+    assert retry.messages[0].images == first.messages[0].images  # the page image is kept
+    assert retry.messages[1].content == bad
+    feedback = retry.messages[2].content
+    assert "lines.0.confidence" in feedback and "less than or equal to 1" in feedback
+    assert retry.schema is PageTranscription and retry.system == VISION_SYSTEM_PROMPT
+
+
+def test_vision_engine_fails_after_max_attempts() -> None:
+    provider = RecordingProvider('{"lines": "nope"}', json.dumps({"lines": [LINE_A]}))
+    with pytest.raises(OcrError, match="after 1 attempt"):
+        VisionOcrEngine(provider, max_attempts=1).recognize(Image.new("L", (10, 10)))
+    assert len(provider.requests) == 1
+    with pytest.raises(ValueError, match="max_attempts"):
+        VisionOcrEngine(provider, max_attempts=0)
 
 
 def test_build_ocr_engine() -> None:
