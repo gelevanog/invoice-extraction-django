@@ -32,7 +32,7 @@ DocExtract automates the typing without giving up control:
 - **Multi-format intake** - text-layer PDFs (page-aware), scanned PDFs, photos and scans (PNG, JPEG, multi-page TIFF), plain text and `.eml` emails including PDF / image / text attachments.
 - **OCR behind an interface** - `tesseract` (local, word boxes and per-word confidence) or `vision` (a vision LLM transcribes the page). Only PDF pages without a usable text layer are OCRed. A value is never more confident than the words it was read from, and poorly recognised words are underlined in the review UI.
 - **LLM structured extraction** - Pydantic schema with a value, confidence and verbatim evidence quote per field; invalid output is sent back to the model with the exact validation errors (up to `LLM_MAX_ATTEMPTS`).
-- **Provider abstraction** - `anthropic` (Claude, structured outputs), `openai` (JSON-schema response format), `openrouter` (any OpenAI-compatible model incl. free ones, with fallback models, retries and throttling) or `fake`, a deterministic offline extractor so the demo and the tests need **zero API keys**.
+- **Provider abstraction** - `anthropic` (Claude, structured outputs), `openai` (JSON-schema response format), `openrouter` (free `:free` models by default, with fallback models, retries and throttling; paid models and other OpenAI-compatible endpoints only with `ALLOW_PAID_MODELS=true`) or `fake`, a deterministic offline extractor so the demo and the tests need **zero API keys**.
 - **Learns from reviewer corrections** - approvals record every field as accepted or corrected; verified documents of the same vendor are added to the extraction prompt as few-shot examples (bounded, corrected first, then most recent).
 - **Accuracy tracking** - share of fields accepted unchanged, per field, per vendor and over time: dashboard, REST endpoint and `manage.py accuracy_report`.
 - **Deterministic validation** - line-item sums, subtotal + tax = total, date sanity, ISO 4217 currency, tax ID formats, duplicate detection, "quote not found in document", scan quality - each a small, pluggable function producing a structured issue with a severity.
@@ -346,7 +346,7 @@ This starts `web` (Django + gunicorn), `worker` (Celery), `db` (PostgreSQL 16) a
 sudo apt install tesseract-ocr   # or brew install tesseract; only needed for scans and photos
 uv sync
 make dev          # migrate, seed demo data + samples, runserver on :8000 (Celery runs inline)
-make test         # 268 tests, offline (OCR tests skip without the tesseract binary)
+make test         # 300 tests, offline (OCR tests skip without the tesseract binary)
 make demo         # batch-process sample_data/ and print the summary table
 make feedback     # the reviewer-correction loop, then the accuracy report
 ```
@@ -383,7 +383,9 @@ docker compose up
 
 `OPENROUTER_FALLBACK_MODELS` is sent as OpenRouter's `models` list (tried in order when the primary is rate-limited or down; the model that answered is stored with each run), `LLM_MAX_RETRIES` makes the SDK retry 429/5xx with exponential backoff, and `LLM_MIN_INTERVAL_SECONDS` spaces requests out for free-tier limits (~20 requests/minute). `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` set the optional attribution headers. Free models come and go and are often rate-limited upstream; the three above supported structured outputs and image input on 2026-09-29.
 
-Note: no Anthropic or OpenAI keys were available while building this; the Claude and OpenAI adapters - including image input for vision OCR - are unit-tested against stubbed SDK clients (request shape, refusal/truncation handling), not against the live APIs. The real-model results above come from OpenRouter free models. All other numbers and outputs in this README come from the offline `fake` provider, which is a regex/layout heuristic tuned for the sample documents - a test double, not a production extractor.
+The `openrouter` provider is free-only by default: a primary or fallback model without the `:free` suffix is rejected unless `ALLOW_PAID_MODELS=true` is set (see [Model comparison](#model-comparison)).
+
+Note: no Anthropic or OpenAI keys were available while building this; the native `anthropic` and `openai` adapters - including image input for vision OCR - are unit-tested against stubbed SDK clients (request shape, refusal/truncation handling), not against the live APIs. The real-model results above come from OpenRouter free models; the Claude and Qwen numbers in [Model comparison](#model-comparison) were produced through an OpenAI-compatible gateway with the `openrouter` provider. All other numbers and outputs in this README come from the offline `fake` provider, which is a regex/layout heuristic tuned for the sample documents - a test double, not a production extractor.
 
 ## Validation rules
 
@@ -468,6 +470,9 @@ All settings come from environment variables (`.env` is read if present). Full, 
 | `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | - / `dots-studio/dots-3-note-preview:free` | OpenRouter credentials and model |
 | `OPENROUTER_FALLBACK_MODELS` | - | comma-separated models OpenRouter tries when the primary is rate-limited or down |
 | `OPENROUTER_SITE_URL` / `OPENROUTER_APP_NAME` | - / `DocExtract` | optional attribution headers (`HTTP-Referer`, `X-Title`) |
+| `ALLOW_PAID_MODELS` | `false` | allow non-`:free` models for `openrouter`; without it they are rejected |
+| `OPENROUTER_BASE_URL` | openrouter.ai | another OpenAI-compatible endpoint for the `openrouter` provider |
+| `LLM_RESPONSE_FORMAT` | `json_schema` | `openrouter`: `json_schema` (non-strict), `strict`, or `none` (schema in the prompt only, for endpoints that reject it) |
 | `LLM_MAX_ATTEMPTS` | `3` | attempts per document when output fails validation |
 | `LLM_MAX_RETRIES` | `2` | SDK retries on 429 / 5xx / connection errors (exponential backoff) |
 | `LLM_MIN_INTERVAL_SECONDS` | `0` | minimum gap between LLM requests per process (~3 for free tiers) |
@@ -605,6 +610,36 @@ The queue after this run:
 
 ![Review queue](docs/queue.png)
 
+## Model comparison
+
+The defaults stay free-only (`fake` offline, or OpenRouter `:free` models); stronger models are an explicit opt-in. On top of the OpenRouter setup above:
+
+```bash
+ALLOW_PAID_MODELS=true                            # without it, non-":free" models are rejected
+OPENROUTER_MODEL=<paid model id>                  # e.g. claude-haiku-5-5 on the gateway used below
+OPENROUTER_BASE_URL=<openai-compatible endpoint>  # optional; empty = openrouter.ai
+LLM_RESPONSE_FORMAT=none                          # only if the endpoint rejects the JSON schema
+```
+
+`manage.py eval_extraction` scores each model against `sample_data/ground_truth.json`: the 8 samples plus the two Haverford invoices, 9 header fields and 27 line items (108 attributes) per run, vision OCR for the scans. Run on 2026-10-12; the free baseline is the 2026-09-29 run above, not re-scored with the harness.
+
+| | Free: `dots-3-note-preview:free` | Claude Haiku 5.5 | Claude Opus 5.5 | Qwen 3.7 Plus |
+|---|---|---|---|---|
+| Runs × documents | 1 × 8 (Tesseract) + vision reruns | 3 × 10 | 2 × 10 | 3 × 10 |
+| Header fields correct | 71/72 | 269/270 | 180/180 | 252/270 (252/252 when processed) |
+| Line-item attributes correct | not scored | 324/324 | 216/216 | 300/324 (300/300 when processed) |
+| Auto-approved per run (ideal: 8 of 10) | 4 of 8 | 5 | 8 | 7, 7, 8 |
+| Median time per document | ≈ 38 s | 6.0 s | 7.3 s | 18.5 s |
+| Cost per document | $0 | ≈ $0.0015 | ≈ $0.05 | ≈ 5.8k gateway tokens (not priced) |
+
+- The set is too small and too easy to rank models on accuracy: every model, free included, was essentially at the ceiling. Read the numbers as "no regressions", not as a ranking.
+- The practical differences are speed, cost and confidence calibration. Haiku is about 6× faster than the free tier for about $0.0015 per document; Opus costs about 33× more than Haiku and was no more accurate here.
+- Opus, and Qwen whenever its OCR worked, were confident and auto-approved exactly the 8 documents that need no review. Haiku was more cautious ("Tax point" date at 0.60, its own photo transcription at 0.65-0.70) and sent 3 correct documents per run to review - but that caution also caught its one OCR misread of a tax ID.
+- The phone photo (08) under vision OCR was the stress case: Haiku misread one digit once in 3 runs (flagged), Opus was correct 2/2, and in 2 of 3 Qwen runs the photo failed because the model wrapped its transcription in a JSON list. Vision OCR now unwraps that shape and retries once with the validation errors fed back; this was verified with unit tests, not by re-running Qwen.
+- Claude through an OpenAI-compatible gateway needed `LLM_RESPONSE_FORMAT=none` (the gateway could not compile the invoice schema in strict mode); Pydantic validation and the retry loop are unchanged, and all 50 Claude extractions were valid on the first attempt.
+
+Full per-field results, routing differences, spend and caveats: [`results/paid-models/COMPARISON.md`](results/paid-models/COMPARISON.md).
+
 ## Testing
 
 ```bash
@@ -612,10 +647,10 @@ make test    # or: uv run pytest
 make lint    # ruff check, ruff format --check, mypy --strict on extraction/
 ```
 
-268 tests, no API keys or services required (fake provider, SQLite, eager Celery):
+300 tests, no API keys or services required (fake provider, SQLite, eager Celery):
 
-- **Unit (216)** - every validator with parametrized edge cases, amount/date/company-name normalization, PDF/email/text parsing, evidence location, vendor fuzzy matching, FX conversion (static table and Frankfurter via `httpx.MockTransport`), keyword and LLM categorization with fallback, the retry loop (scripted fake LLM that fails first and succeeds on the next attempt, error feedback content, max attempts, transport errors), routing thresholds, status transitions; OCR layout assembly, Tesseract output parsing and error mapping (binary stubbed), vision OCR (LLM stubbed), scanned/mixed PDFs, multi-page TIFF, image attachments, OCR confidence capping; few-shot rendering and budget, vendor detection in raw text, the fake provider learning labels; the Anthropic/OpenAI/OpenRouter adapters against stubbed clients (structured output, image blocks, fallback models, headers, throttling, portable schema).
-- **Integration (52)** - all sample documents end to end with asserted routing, fuzzy vendor linking, duplicate detection, field edits that resolve issues, approval side effects, reprocessing, `process_folder`/`seed_demo`; real Tesseract on the scan and the photo (pipeline, persisted word boxes, review page); the correction loop (field reviews, examples in the next extraction, accuracy report, dashboard, API, commands); REST API (auth, upload, filters, approve/reject, CSV/JSON export, OpenAPI); review UI (queue filters, htmx partials, inline editing, decisions, uncertain-word highlighting).
+- **Unit (236)** - every validator with parametrized edge cases, amount/date/company-name normalization, PDF/email/text parsing, evidence location, vendor fuzzy matching, FX conversion (static table and Frankfurter via `httpx.MockTransport`), keyword and LLM categorization with fallback, the retry loop (scripted fake LLM that fails first and succeeds on the next attempt, error feedback content, max attempts, transport errors), routing thresholds, status transitions; OCR layout assembly, Tesseract output parsing and error mapping (binary stubbed), vision OCR (LLM stubbed, wrong-shape responses unwrapped, one retry with feedback), scanned/mixed PDFs, multi-page TIFF, image attachments, OCR confidence capping; few-shot rendering and budget, vendor detection in raw text, the fake provider learning labels; the Anthropic/OpenAI/OpenRouter adapters against stubbed clients (structured output, image blocks, fallback models, headers, throttling, portable schema, free-only guard, response-format modes).
+- **Integration (64)** - all sample documents end to end with asserted routing, fuzzy vendor linking, duplicate detection, field edits that resolve issues, approval side effects, reprocessing, `process_folder`/`seed_demo`/`eval_extraction`; real Tesseract on the scan and the photo (pipeline, persisted word boxes, review page); the correction loop (field reviews, examples in the next extraction, accuracy report, dashboard, API, commands); REST API (auth, upload, filters, approve/reject, CSV/JSON export, OpenAPI); review UI (queue filters, htmx partials, inline editing, decisions, uncertain-word highlighting).
 
 Tests that need the `tesseract` binary are marked `requires_tesseract` and skip without it; CI installs Tesseract and sets `REQUIRE_TESSERACT=true`, which turns a missing binary into a failure instead of silent skips.
 
