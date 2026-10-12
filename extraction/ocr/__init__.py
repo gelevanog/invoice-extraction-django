@@ -24,7 +24,7 @@ def build_ocr_engine(
         return TesseractOcrEngine(languages)
     if name == "vision":
         if provider is None or provider.name == "fake":
-            raise ValueError("OCR_ENGINE=vision needs LLM_PROVIDER=anthropic or openai")
+            raise ValueError("OCR_ENGINE=vision needs LLM_PROVIDER=anthropic, openai or openrouter")
         from extraction.ocr.vision import VisionOcrEngine
 
         return VisionOcrEngine(provider)
