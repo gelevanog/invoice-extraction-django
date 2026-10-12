@@ -123,13 +123,20 @@ def test_paid_models_and_custom_endpoint_with_explicit_opt_in(
     assert str(client.base_url).rstrip("/") == "http://127.0.0.1:8787/v1"
 
 
-def test_schema_strictness_is_configurable() -> None:
+def test_response_format_is_configurable() -> None:
     client, completions = _client(_completion("m:free"))
     OpenRouterProvider("m:free", client=client).complete_json(REQUEST)
     assert completions.kwargs["response_format"]["json_schema"]["strict"] is False
-    OpenRouterProvider("m:free", client=client, strict_schema=True).complete_json(REQUEST)
+    OpenRouterProvider("m:free", client=client, response_format="strict").complete_json(REQUEST)
     assert completions.kwargs["response_format"]["json_schema"]["strict"] is True
     assert "temperature" not in completions.kwargs  # never sent (some models reject it)
+    OpenRouterProvider("m:free", client=client, response_format="none").complete_json(REQUEST)
+    assert "response_format" not in completions.kwargs
+    system = completions.kwargs["messages"][0]["content"]  # the schema moves into the prompt
+    assert system.startswith("sys\n\nRespond with a single JSON object")
+    assert '"vendor_name"' in system
+    with pytest.raises(ValueError, match="Unknown response format"):
+        OpenRouterProvider("m:free", client=client, response_format="xml")  # type: ignore[arg-type]
 
 
 def test_throttle_spaces_requests(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -197,8 +204,8 @@ def test_settings_default_to_free_only(settings: Any, monkeypatch: pytest.Monkey
         **settings.DOCEXTRACT,
         "ALLOW_PAID_MODELS": True,
         "OPENROUTER_BASE_URL": "http://127.0.0.1:8787/v1",
-        "LLM_JSON_SCHEMA_STRICT": True,
+        "LLM_RESPONSE_FORMAT": "none",
     }
     provider = build_llm_provider()
     assert provider.model == "claude-haiku-5-5"
-    assert provider._strict_schema is True  # type: ignore[attr-defined]
+    assert provider._response_format == "none"  # type: ignore[attr-defined]

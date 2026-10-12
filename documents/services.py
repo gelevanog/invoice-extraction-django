@@ -71,7 +71,7 @@ def build_llm_provider() -> LLMProvider:
         app_name=cfg["OPENROUTER_APP_NAME"],
         base_url=cfg["OPENROUTER_BASE_URL"],
         allow_paid_models=cfg["ALLOW_PAID_MODELS"],
-        strict_schema=cfg["LLM_JSON_SCHEMA_STRICT"],
+        response_format=cfg["LLM_RESPONSE_FORMAT"],
     )
 
 

@@ -130,7 +130,7 @@ DOCEXTRACT = {
     # Opt-in for non-":free" models and other OpenAI-compatible endpoints (default: free only).
     "ALLOW_PAID_MODELS": env.bool("ALLOW_PAID_MODELS", default=False),
     "OPENROUTER_BASE_URL": env("OPENROUTER_BASE_URL", default=""),
-    "LLM_JSON_SCHEMA_STRICT": env.bool("LLM_JSON_SCHEMA_STRICT", default=False),
+    "LLM_RESPONSE_FORMAT": env("LLM_RESPONSE_FORMAT", default="json_schema"),
     "LLM_MAX_ATTEMPTS": env.int("LLM_MAX_ATTEMPTS", default=3),
     "LLM_MAX_RETRIES": env.int("LLM_MAX_RETRIES", default=2),
     "LLM_MIN_INTERVAL_SECONDS": env.float("LLM_MIN_INTERVAL_SECONDS", default=0.0),

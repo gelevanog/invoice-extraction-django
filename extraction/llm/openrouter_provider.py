@@ -18,7 +18,7 @@ from collections.abc import Sequence
 
 import openai
 
-from extraction.llm.openai_provider import OpenAIProvider
+from extraction.llm.openai_provider import OpenAIProvider, ResponseFormatMode
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_OPENROUTER_MODEL = "dots-studio/dots-3-note-preview:free"
@@ -54,7 +54,7 @@ class OpenRouterProvider(OpenAIProvider):
         min_interval: float = 0.0,
         base_url: str = "",
         allow_paid_models: bool = False,
-        strict_schema: bool = False,
+        response_format: ResponseFormatMode = "json_schema",
     ) -> None:
         check_free_models([model, *fallback_models], allow_paid_models=allow_paid_models)
         if client is None:
@@ -75,5 +75,5 @@ class OpenRouterProvider(OpenAIProvider):
             client=client,
             min_interval=min_interval,
             extra_body={"models": [model, *fallbacks]} if fallbacks else None,
-            strict_schema=strict_schema,
+            response_format=response_format,
         )

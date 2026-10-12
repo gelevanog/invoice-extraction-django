@@ -12,6 +12,7 @@ from extraction.llm.base import (
     LLMProvider,
     LLMResponse,
 )
+from extraction.llm.openai_provider import ResponseFormatMode
 
 PROVIDER_NAMES = ("fake", "openai", "anthropic", "openrouter")
 
@@ -29,12 +30,12 @@ def build_provider(
     app_name: str = "",
     base_url: str = "",
     allow_paid_models: bool = False,
-    strict_schema: bool = False,
+    response_format: ResponseFormatMode = "json_schema",
 ) -> LLMProvider:
     """Instantiate a provider by name. SDK imports are lazy so ``fake`` needs no keys.
 
     ``max_retries`` / ``min_interval`` apply to the real providers; ``fallback_models``,
-    ``site_url``, ``app_name``, ``base_url``, ``allow_paid_models`` and ``strict_schema``
+    ``site_url``, ``app_name``, ``base_url``, ``allow_paid_models`` and ``response_format``
     only to ``openrouter``, which rejects non-``:free`` models unless
     ``allow_paid_models`` is set.
     """
@@ -80,7 +81,7 @@ def build_provider(
             min_interval=min_interval,
             base_url=base_url,
             allow_paid_models=allow_paid_models,
-            strict_schema=strict_schema,
+            response_format=response_format,
         )
     raise ValueError(f"Unknown LLM provider '{name}'. Choose one of: {', '.join(PROVIDER_NAMES)}")
 
